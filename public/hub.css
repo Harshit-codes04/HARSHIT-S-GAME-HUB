@@ -379,7 +379,7 @@ textarea {
   cursor: pointer;
 }
 
-/* Responsive */
+/* Responsive & Mobile Enhancements */
 @media (max-width: 950px) {
   .hub-grid-area {
     grid-template-columns: repeat(2, 1fr);
@@ -388,17 +388,139 @@ textarea {
   }
 }
 
-@media (max-width: 500px) {
-  .hub-grid-area {
-    grid-template-columns: 1fr;
+@media (max-width: 640px) {
+  body {
+    padding: 8px 6px;
+  }
+  
+  .hub-container {
+    gap: 10px;
   }
 
-  .nav-segment-btn {
-    padding: 0 14px;
-    font-size: 0.8rem;
+  .hub-header {
+    border-width: 2px;
+  }
+
+  .hub-bar-top {
+    font-size: 0.72rem;
+    padding: 6px 8px;
+    letter-spacing: 1px;
+  }
+
+  .hub-navbar {
+    height: auto;
+    flex-wrap: wrap;
+    background: #0f131c;
+  }
+
+  .nav-title-segment {
+    order: 1;
+    width: 100%;
+    padding: 8px 10px;
+    border-bottom: 1px solid #1e293b;
+    justify-content: center;
   }
 
   .nav-title-segment h1 {
     font-size: 1.15rem;
+    letter-spacing: 1.5px;
+  }
+
+  .nav-segment-btn {
+    padding: 10px 10px;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    flex: 1;
+    text-align: center;
+    border-right: 1px solid #232d3f;
+    border-left: none !important;
+  }
+
+  .hub-navbar > div[style*="display:flex"] {
+    display: flex;
+    flex: 2;
+    order: 2;
+  }
+
+  .hub-navbar > div[style*="display:flex"] .nav-segment-btn {
+    flex: 1;
+  }
+
+  #openMenuBtn {
+    order: 2;
+    flex: 1.2;
+  }
+
+  .category-pill-bar {
+    padding: 8px 10px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cat-pill {
+    font-size: 0.76rem;
+    padding: 5px 11px;
+  }
+
+  .search-bar-row input {
+    font-size: 0.9rem;
+    padding: 11px 14px;
+    border-radius: 8px;
+  }
+
+  .hub-grid-area {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    padding: 8px;
+    gap: 8px;
+    border-width: 2px;
+  }
+
+  .game-box {
+    padding: 14px 10px;
+    min-height: 160px;
+    border-radius: 10px;
+  }
+
+  .game-box-icon {
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+  }
+
+  .game-box-title {
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+  }
+
+  .game-box-desc {
+    font-size: 0.72rem;
+    line-height: 1.25;
+    margin-bottom: 8px;
+    -webkit-line-clamp: 2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .game-box-play {
+    font-size: 0.72rem;
+    padding: 5px 10px;
+  }
+
+  .hub-modal-card {
+    width: 95vw;
+    max-width: 400px;
+    padding: 16px;
+    max-height: 90vh;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .hub-grid-area {
+    grid-template-columns: 1fr;
+  }
+  .nav-segment-btn {
+    font-size: 0.7rem;
+    padding: 8px 6px;
   }
 }
