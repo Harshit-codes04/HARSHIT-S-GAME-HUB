@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG Multiplayer</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header / Scoreboard Bar -->
+    <header class="header">
+      <div class="header-left">
+        <a href="/" class="hub-back-btn" title="Back to Game Hub">🏠 Hub</a>
+        <h1 class="logo">PEN FIGHT</h1>
+        <span class="mode-badge" id="modeBadge">Mode: 1v1 PvP</span>
+        <span class="room-tag" id="roomTag">Room: CLASSIC</span>
+        <button id="openStoreBtn" class="store-badge-btn" title="Open Store">🛒 Store (🪙 <span id="headerCoinCount">100</span>)</button>
+        <button id="inGameThemeBtn" class="theme-switch-btn" title="Change Theme & Loadout">🎨 Theme / Loadout</button>
+      </div>
+
+      <div class="turn-banner" id="turnIndicator">Waiting for players to join...</div>
+
+      <!-- Scoreboard Container dynamically populated for 2 to 5 players -->
+      <div class="scoreboard-ribbon" id="scoreboardRibbon"></div>
+    </header>
+
+    <!-- Game Arena Area -->
+    <main class="arena-wrapper">
+      <div class="desk-container" id="deskContainer">
+        <canvas id="gameCanvas" width="900" height="600"></canvas>
+      </div>
+
+      <!-- Controls & Guide Footer Bar -->
+      <footer class="footer-bar">
+        <div class="footer-left">
+          <div class="guide-tag">🎯 Flick Controls</div>
+          <button id="flickModeToggle" style="background:#1e293b; border:1px solid #38bdf8; color:#38bdf8; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:bold; cursor:pointer; margin-right:8px;">Aim: Pull-Back (Slingshot)</button>
+          <span class="guide-text" id="guideTextDesc">Pull backward from pen to set power & aim. Release to strike! Knock opponents off to win.</span>
+        </div>
+
+        <div class="footer-right">
+          <div class="room-chip">
+            <span class="room-chip-label">Room</span>
+            <strong id="footerRoomCode">CLASSIC</strong>
+          </div>
+          <button id="copyUrlBtn" class="copy-invite-pill" title="Click to copy invite link">
+            <span>🔗 Copy Invite Link</span>
+          </button>
+        </div>
+      </footer>
+    </main>
+
+    <!-- Modal: Stepped / Sectioned Lobby Setup -->
+    <div class="overlay" id="lobbyModal">
+      <div class="modal-card lobby-card">
+        <div class="modal-header">
+          <h2>🖊️ PEN FIGHT ARENA</h2>
+          <p class="subtitle">Quick setup before entering the match</p>
+        </div>
+
+        <!-- Section Navigation Steps -->
+        <div class="step-indicator">
+          <div class="step-tab active" data-step="1">
+            <span class="step-num">1</span>
+            <span class="step-label">Game Mode</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step-tab" data-step="2">
+            <span class="step-num">2</span>
+            <span class="step-label">Your Pen</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step-tab" data-step="3">
+            <span class="step-num">3</span>
+            <span class="step-label">Desk Arena</span>
+          </div>
+        </div>
+
+        <!-- Section 1: Mode & Room -->
+        <div class="modal-section-panel active" id="sectionStep1">
+          <div class="input-group">
+            <label for="playerNameInput">Your Nickname</label>
+            <input type="text" id="playerNameInput" placeholder="Enter your name..." maxlength="15" value="Striker">
+          </div>
+
+          <label class="section-label">Select Game Mode</label>
+          <div class="mode-selector">
+            <div class="mode-card active" data-mode="PVP">
+              <div class="mode-icon">⚔️</div>
+              <div class="mode-title">1 vs 1 PvP</div>
+              <div class="mode-desc">Duel a friend via Room Code</div>
+            </div>
+
+            <div class="mode-card" data-mode="BOT">
+              <div class="mode-icon">🤖</div>
+              <div class="mode-title">vs AI Bot</div>
+              <div class="mode-desc">Practice offline against computer</div>
+            </div>
+
+            <div class="mode-card" data-mode="PARTY">
+              <div class="mode-icon">👑</div>
+              <div class="mode-title">Party Battle</div>
+              <div class="mode-desc">3 to 5 Players Battle Royale</div>
+            </div>
+          </div>
+
+          <div class="input-group hidden" id="partySettings">
+            <label for="partySizeSelect">Number of Players</label>
+            <select id="partySizeSelect" class="styled-select">
+              <option value="3">3 Players</option>
+              <option value="4" selected>4 Players</option>
+              <option value="5">5 Players</option>
+            </select>
+          </div>
+
+          <div class="input-group" id="roomGroup">
+            <label for="roomInput">Room Code</label>
+            <div class="room-input-container">
+              <input type="text" id="roomInput" placeholder="e.g. BATTLE7" value="CLASSIC" maxlength="10">
+              <button type="button" id="randomRoomBtn" class="secondary-btn" title="Generate Random Room Code">🎲 Random</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Choose Pen Loadout -->
+        <div class="modal-section-panel hidden" id="sectionStep2">
+          <label class="section-label">Choose Your Weapon & Physics Profile</label>
+          <div class="pen-selector-grid">
+            <div class="pen-card active" data-pen="GEL">
+              <div class="pen-card-icon">🖊️</div>
+              <div class="pen-card-title">Gel Pen</div>
+              <div class="pen-stats">
+                <span class="stat-pill">Speed: ★★★☆</span>
+                <span class="stat-pill">Weight: ★★★☆</span>
+              </div>
+              <div class="pen-pro-con">
+                <span class="pro">✔ Balanced slide & control</span>
+                <span class="con">✖ Standard stats</span>
+              </div>
+            </div>
+
+            <div class="pen-card" data-pen="FOUNTAIN">
+              <div class="pen-card-icon">🖋️</div>
+              <div class="pen-card-title">Fountain Pen</div>
+              <div class="pen-stats">
+                <span class="stat-pill">Speed: ★★☆☆</span>
+                <span class="stat-pill">Weight: ★★★★★</span>
+              </div>
+              <div class="pen-pro-con">
+                <span class="pro">✔ Heavy tank & brutal impact</span>
+                <span class="con">✖ Slower slide across desk</span>
+              </div>
+            </div>
+
+            <div class="pen-card" data-pen="PENCIL">
+              <div class="pen-card-icon">✏️</div>
+              <div class="pen-card-title">Wooden Pencil</div>
+              <div class="pen-stats">
+                <span class="stat-pill">Speed: ★★★★★</span>
+                <span class="stat-pill">Weight: ★☆☆☆</span>
+              </div>
+              <div class="pen-pro-con">
+                <span class="pro">✔ Ultra fast & slides far</span>
+                <span class="con">✖ Light & easily knocked out</span>
+              </div>
+            </div>
+
+            <div class="pen-card" data-pen="SKETCH">
+              <div class="pen-card-icon">🖍️</div>
+              <div class="pen-card-title">Sketch Pen</div>
+              <div class="pen-stats">
+                <span class="stat-pill">Speed: ★★☆☆</span>
+                <span class="stat-pill">Weight: ★★★★☆</span>
+              </div>
+              <div class="pen-pro-con">
+                <span class="pro">✔ Wide body & strong desk grip</span>
+                <span class="con">✖ High drag / short slide</span>
+              </div>
+            </div>
+
+            <!-- Store Unlockable Pens -->
+            <div class="pen-card locked" data-pen="GOLD_QUILL" id="penCardGoldQuill">
+              <div class="lock-overlay">🔒 150 Coins</div>
+              <div class="pen-card-icon">🪶</div>
+              <div class="pen-card-title">Golden Quill</div>
+              <div class="pen-stats">
+                <span class="stat-pill">Speed: ★★★★☆</span>
+                <span class="stat-pill">Weight: ★★★★☆</span>
+              </div>
+              <div class="pen-pro-con">
+                <span class="pro">✔ Gold slide + high impact</span>
+                <span class="con">✖ Premium store item</span>
+              </div>
+            </div>
+
+            <div class="pen-card locked" data-pen="LASER_PEN" id="penCardLaserPen">
+              <div class="lock-overlay">🔒 300 Coins</div>
+              <div class="pen-card-icon">⚡</div>
+              <div class="pen-card-title">Cyber Laser</div>
+              <div class="pen-stats">
+                <span class="stat-pill">Speed: ★★★★★</span>
+                <span class="stat-pill">Weight: ★★★☆☆</span>
+              </div>
+              <div class="pen-pro-con">
+                <span class="pro">✔ Hyper-speed aero flick</span>
+                <span class="con">✖ Mythic store item</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Choose Arena Theme & Dynamic Obstacles -->
+        <div class="modal-section-panel hidden" id="sectionStep3">
+          <label class="section-label">Choose Arena Environment</label>
+          <div class="theme-selector-grid">
+            <div class="theme-card active" data-theme="SCHOOL_BENCH">
+              <div class="theme-preview school-preview"></div>
+              <span>🏫 School Desk</span>
+              <small class="theme-obs-note">Obstacles: Eraser & Sharpener</small>
+            </div>
+            <div class="theme-card" data-theme="OFFICE_DESK">
+              <div class="theme-preview office-preview"></div>
+              <span>🏢 Office Desk</span>
+              <small class="theme-obs-note">Obstacles: Coffee Mug & Stapler</small>
+            </div>
+            <div class="theme-card" data-theme="DINING_TABLE">
+              <div class="theme-preview dining-preview"></div>
+              <span>🍽️ Dining Table</span>
+              <small class="theme-obs-note">Obstacles: Salt & Pepper Shakers</small>
+            </div>
+            <div class="theme-card" data-theme="CHALKBOARD">
+              <div class="theme-preview chalk-preview"></div>
+              <span>📋 Green Board</span>
+              <small class="theme-obs-note">Obstacles: Blackboard Duster</small>
+            </div>
+          </div>
+
+          <div class="guide-note" id="guideNote" style="margin-top: 14px;">
+            💡 <strong>Room Code System:</strong> Share your room code so opponents can join your battle arena!
+          </div>
+        </div>
+
+        <!-- Section Footer Controls -->
+        <div class="modal-footer-nav">
+          <button type="button" id="prevStepBtn" class="secondary-btn hidden">← Back</button>
+          <div class="spacer"></div>
+          <button type="button" id="nextStepBtn" class="primary-btn">Next: Choose Pen →</button>
+          <button type="button" id="joinBtn" class="primary-btn hidden">Enter Arena ⚔️</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Pen Shop / Store -->
+    <div class="overlay hidden" id="storeModal">
+      <div class="modal-card store-card">
+        <div class="modal-header">
+          <div class="store-header-title">
+            <h2>🛒 PEN VAULT & STORE</h2>
+            <span class="store-wallet">Your Coins: 🪙 <strong id="storeCoinCount">100</strong></span>
+          </div>
+          <p class="subtitle">Win rounds & matches to earn coins. Unlock exclusive pens & arena perks!</p>
+        </div>
+
+        <div class="store-items-list">
+          <!-- Item 1: Golden Feather Quill -->
+          <div class="store-item-row" id="storeItemGoldQuill">
+            <div class="store-item-icon">🪶</div>
+            <div class="store-item-info">
+              <div class="store-item-name">Golden Feather Quill <span class="rarity legendary">LEGENDARY</span></div>
+              <div class="store-item-desc">Royal ink quill forged in gold. High velocity slide with heavy clack impact.</div>
+              <div class="store-item-perk">⚡ +20% Power & Reduced Air Friction</div>
+            </div>
+            <div class="store-item-action">
+              <button class="buy-btn" data-item="GOLD_QUILL" data-cost="150">🪙 150 Coins</button>
+            </div>
+          </div>
+
+          <!-- Item 2: Cyber Laser Pointer -->
+          <div class="store-item-row" id="storeItemLaserPen">
+            <div class="store-item-icon">⚡</div>
+            <div class="store-item-info">
+              <div class="store-item-name">Cyber Laser Pointer <span class="rarity mythic">MYTHIC</span></div>
+              <div class="store-item-desc">Aerospace metallic alloy with neon neon-pulse core. Extreme agility.</div>
+              <div class="store-item-perk">🚀 +35% Power & Low Air Friction</div>
+            </div>
+            <div class="store-item-action">
+              <button class="buy-btn" data-item="LASER_PEN" data-cost="300">🪙 300 Coins</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="closeStoreBtn" class="primary-btn">Close Store</button>
+        </div>
+      </div>
+    </div>
+    <div class="overlay hidden" id="resultModal">
+      <div class="modal-card result-card">
+        <div class="result-icon" id="resultIcon">🏆</div>
+        <h2 id="resultTitle">ROUND WON!</h2>
+        <p id="resultDesc">Player survived the desk arena!</p>
+        <div class="result-score-display" id="resultScoreDisplay"></div>
+        <div class="modal-actions">
+          <button id="rematchBtn" class="primary-btn hidden">Play Rematch</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="client.js"></script>
+</body>
+</html>

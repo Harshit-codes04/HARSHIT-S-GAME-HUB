@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Speed Chess 8x8 - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body { background: #060913; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+    header { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 460px; margin-bottom: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; }
+    .modes { display: flex; gap: 4px; background: #111827; padding: 3px; border-radius: 8px; }
+    .m-btn { background: transparent; border: none; color: #94a3b8; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
+    .m-btn.active { background: #0284c7; color: #fff; }
+    .status { background: #0f172a; border: 1px solid #1e293b; padding: 6px 14px; border-radius: 8px; font-weight: 900; color: #facc15; margin-bottom: 8px; }
+    .board { display: grid; grid-template-columns: repeat(8, 48px); grid-template-rows: repeat(8, 48px); border: 4px solid #334155; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    @media (max-width: 420px) {
+      .board { grid-template-columns: repeat(8, 40px); grid-template-rows: repeat(8, 40px); }
+    }
+    .sq { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: pointer; }
+    .sq.light { background: #cbd5e1; color: #000; }
+    .sq.dark { background: #475569; color: #000; }
+    .sq.highlight { background: #38bdf8 !important; }
+    .sq.selected { background: #facc15 !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="modes">
+      <button class="m-btn active" id="bBtn" onclick="setMode('bot')">🤖 vs Bot</button>
+      <button class="m-btn" id="pBtn" onclick="setMode('pvp')">⚔️ 1v1 Local</button>
+    </div>
+  </header>
+
+  <div class="status" id="status">♔ White's Turn to Move</div>
+  <div class="board" id="board"></div>
+
+  <script>
+    const INITIAL = [
+      ['♜','♞','♝','♛','♚','♝','♞','♜'],
+      ['♟','♟','♟','♟','♟','♟','♟','♟'],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['♙','♙','♙','♙','♙','♙','♙','♙'],
+      ['♖','♘','♗','♕','♔','♗','♘','♖']
+    ];
+
+    let grid = JSON.parse(JSON.stringify(INITIAL));
+    let turn = 'white'; // white pieces: ♖,♘,♗,♕,♔,♙ (bottom), black pieces: ♜,♞,♝,♛,♚,♟ (top)
+    let selected = null;
+    let mode = 'bot';
+
+    function isWhite(char) { return ['♖','♘','♗','♕','♔','♙'].includes(char); }
+    function isBlack(char) { return ['♜','♞','♝','♛','♚','♟'].includes(char); }
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('bBtn').className = m === 'bot' ? 'm-btn active' : 'm-btn';
+      document.getElementById('pBtn').className = m === 'pvp' ? 'm-btn active' : 'm-btn';
+      grid = JSON.parse(JSON.stringify(INITIAL));
+      turn = 'white'; selected = null;
+      render();
+    }
+
+    function render() {
+      const b = document.getElementById('board');
+      b.innerHTML = '';
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const sq = document.createElement('div');
+          sq.className = 'sq ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
+          sq.textContent = grid[r][c];
+
+          if (selected && selected.r === r && selected.c === c) {
+            sq.classList.add('selected');
+          }
+
+          sq.onclick = () => onSqClick(r, c);
+          b.appendChild(sq);
+        }
+      }
+      document.getElementById('status').textContent = turn === 'white' ? '♔ White\'s Turn' : (mode === 'bot' ? '🤖 Bot Moving...' : '♚ Black\'s Turn');
+    }
+
+    function onSqClick(r, c) {
+      if (mode === 'bot' && turn === 'black') return;
+      const piece = grid[r][c];
+
+      if (selected) {
+        if (selected.r === r && selected.c === c) {
+          selected = null;
+          render();
+          return;
+        }
+        // Move piece
+        const movingPiece = grid[selected.r][selected.c];
+        grid[r][c] = movingPiece;
+        grid[selected.r][selected.c] = '';
+        selected = null;
+        turn = turn === 'white' ? 'black' : 'white';
+        render();
+
+        if (mode === 'bot' && turn === 'black') {
+          setTimeout(botMove, 400);
+        }
+      } else {
+        if (!piece) return;
+        if (turn === 'white' && isWhite(piece)) {
+          selected = { r, c };
+          render();
+        } else if (turn === 'black' && isBlack(piece)) {
+          selected = { r, c };
+          render();
+        }
+      }
+    }
+
+    function botMove() {
+      const blackPieces = [];
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          if (isBlack(grid[r][c])) blackPieces.push({ r, c, piece: grid[r][c] });
+        }
+      }
+      if (blackPieces.length === 0) return;
+
+      const p = blackPieces[Math.floor(Math.random() * blackPieces.length)];
+      // Try to advance forward or capture
+      const targetR = Math.min(7, p.r + 1);
+      const targetC = Math.max(0, Math.min(7, p.c + (Math.random() > 0.5 ? 1 : -1)));
+
+      grid[targetR][targetC] = p.piece;
+      grid[p.r][p.c] = '';
+      turn = 'white';
+      render();
+    }
+
+    render();
+  </script>
+</body>
+</html>
+

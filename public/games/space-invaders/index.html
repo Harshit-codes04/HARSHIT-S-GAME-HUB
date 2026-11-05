@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Alien Invaders - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      background: #060913; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+    }
+    header { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 480px; margin-bottom: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; }
+    .score-box { background: #0f172a; border: 1px solid #1e293b; padding: 5px 14px; border-radius: 8px; font-weight: 900; color: #facc15; }
+    canvas { background: #050811; border: 4px solid #1e293b; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); touch-action: none; max-width: 100%; height: auto; }
+    .ctrl-bar { display: flex; gap: 12px; margin-top: 10px; width: 100%; max-width: 460px; justify-content: space-between; }
+    .btn { background: #1e293b; color: #fff; border: 1px solid #334155; padding: 12px 24px; border-radius: 10px; font-size: 1.1rem; font-weight: 800; cursor: pointer; flex: 1; }
+    .fire-btn { background: #e11d48; border-color: #f43f5e; color: #fff; flex: 1.4; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="score-box">👾 Score: <b id="score">0</b></div>
+  </header>
+
+  <canvas id="c" width="460" height="540"></canvas>
+
+  <div class="ctrl-bar">
+    <button class="btn" onpointerdown="keys['ArrowLeft']=true" onpointerup="keys['ArrowLeft']=false">⬅️ Left</button>
+    <button class="btn fire-btn" onclick="fireCannon()">FIRE 💥</button>
+    <button class="btn" onpointerdown="keys['ArrowRight']=true" onpointerup="keys['ArrowRight']=false">Right ➡️</button>
+  </div>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    let score = 0, gameOver = false, frame = 0;
+    const keys = {};
+
+    window.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if (e.code === 'Space') fireCannon();
+    });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    // Audio SFX
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function sfx(freq, type='square', dur=0.06) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        g.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    const canon = { x: 215, y: 500, w: 32, h: 22, color: '#38bdf8' };
+    let bullets = [];
+    let aliens = [];
+    let alienDir = 1;
+
+    function initAliens() {
+      aliens = [];
+      for (let r = 0; r < 4; r++) {
+        for (let col = 0; col < 8; col++) {
+          aliens.push({
+            x: 45 + col * 46,
+            y: 50 + r * 38,
+            w: 28, h: 22,
+            alive: true,
+            color: r === 0 ? '#f43f5e' : r === 1 ? '#fb923c' : r === 2 ? '#facc15' : '#4ade80'
+          });
+        }
+      }
+    }
+
+    function fireCannon() {
+      if (gameOver) { score = 0; gameOver = false; initAliens(); return; }
+      bullets.push({ x: canon.x + canon.w / 2 - 2, y: canon.y - 10, vy: -10 });
+      sfx(700, 'square', 0.05);
+    }
+
+    c.addEventListener('pointermove', e => {
+      const rect = c.getBoundingClientRect();
+      canon.x = Math.max(10, Math.min(c.width - canon.w - 10, (e.clientX - rect.left) * (c.width / rect.width) - canon.w / 2));
+    });
+
+    function loop() {
+      frame++;
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      if (!gameOver) {
+        if (keys['ArrowLeft']) canon.x = Math.max(10, canon.x - 5);
+        if (keys['ArrowRight']) canon.x = Math.min(c.width - canon.w - 10, canon.x + 5);
+
+        // Move Aliens
+        if (frame % 25 === 0) {
+          let hitWall = false;
+          aliens.forEach(a => {
+            if (a.alive) {
+              if (a.x + a.w >= c.width - 15 || a.x <= 15) hitWall = true;
+            }
+          });
+          if (hitWall) {
+            alienDir *= -1;
+            aliens.forEach(a => { a.y += 18; if (a.y + a.h >= canon.y) gameOver = true; });
+          } else {
+            aliens.forEach(a => { a.x += alienDir * 12; });
+          }
+        }
+
+        // Update Bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.y += b.vy;
+          if (b.y < 0) { bullets.splice(i, 1); continue; }
+
+          for (let a of aliens) {
+            if (a.alive && b.x > a.x && b.x < a.x + a.w && b.y > a.y && b.y < a.y + a.h) {
+              a.alive = false;
+              bullets.splice(i, 1);
+              score += 20;
+              document.getElementById('score').textContent = score;
+              sfx(250, 'sawtooth', 0.1);
+              if (aliens.every(k => !k.alive)) initAliens();
+              break;
+            }
+          }
+        }
+      }
+
+      // Draw Aliens
+      for (let a of aliens) {
+        if (a.alive) {
+          ctx.fillStyle = a.color;
+          ctx.fillRect(a.x, a.y, a.w, a.h);
+          ctx.fillStyle = '#060913';
+          ctx.fillRect(a.x + 4, a.y + 4, 4, 4);
+          ctx.fillRect(a.x + a.w - 8, a.y + 4, 4, 4);
+        }
+      }
+
+      // Draw Bullets
+      ctx.fillStyle = '#38bdf8';
+      for (let b of bullets) ctx.fillRect(b.x, b.y, 4, 12);
+
+      // Draw Cannon
+      ctx.fillStyle = canon.color;
+      ctx.fillRect(canon.x, canon.y + 8, canon.w, canon.h - 8);
+      ctx.fillRect(canon.x + canon.w / 2 - 3, canon.y, 6, 8);
+
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = 'bold 30px system-ui';
+        ctx.fillText('INVASION FAILED', c.width / 2 - 120, c.height / 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '16px system-ui';
+        ctx.fillText('Tap to Restart', c.width / 2 - 50, c.height / 2 + 35);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    c.addEventListener('click', () => { if (gameOver) { score = 0; gameOver = false; initAliens(); } });
+
+    initAliens();
+    loop();
+  </script>
+</body>
+</html>
+

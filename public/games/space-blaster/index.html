@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Galaxy Space Blaster - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      background: #060913;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 460px;
+      margin-bottom: 8px;
+    }
+    .back-btn {
+      background: #1e293b;
+      color: #38bdf8;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    .score-box {
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: #38bdf8;
+      background: #0f172a;
+      padding: 5px 14px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+    }
+    canvas {
+      background: radial-gradient(circle at center, #0a0e1a 0%, #03060d 100%);
+      border: 4px solid #1e293b;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 25px rgba(56, 189, 248, 0.25);
+      touch-action: none;
+      max-width: 100%;
+      height: auto;
+    }
+    .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="score-box">🚀 Score: <span id="score">0</span></div>
+  </header>
+
+  <canvas id="c" width="440" height="600"></canvas>
+  <div class="hint">Drag finger or mouse to guide spaceship • Auto-fires plasma lasers!</div>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    let score = 0, gameOver = false;
+
+    // Audio Synthesizer
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function sfx(freq, type='sine', dur=0.06, vol=0.2) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        g.gain.setValueAtTime(vol, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    const ship = { x: 220, y: 520, w: 36, h: 36, color: '#38bdf8' };
+    const stars = Array.from({ length: 60 }, () => ({
+      x: Math.random() * c.width,
+      y: Math.random() * c.height,
+      r: Math.random() * 1.5 + 0.5,
+      spd: Math.random() * 2 + 1
+    }));
+
+    let bullets = [];
+    let enemies = [];
+    let particles = [];
+    let frame = 0;
+
+    function setShipPos(clientX, clientY) {
+      const rect = c.getBoundingClientRect();
+      const scaleX = c.width / rect.width;
+      const scaleY = c.height / rect.height;
+      ship.x = Math.max(20, Math.min(c.width - 20, (clientX - rect.left) * scaleX));
+      ship.y = Math.max(100, Math.min(c.height - 30, (clientY - rect.top) * scaleY));
+    }
+
+    c.addEventListener('mousemove', e => setShipPos(e.clientX, e.clientY));
+    c.addEventListener('touchmove', e => {
+      e.preventDefault();
+      setShipPos(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
+    function spawnEnemy() {
+      const colors = ['#f43f5e', '#fb923c', '#a855f7', '#10b981'];
+      enemies.push({
+        x: Math.random() * (c.width - 50) + 25,
+        y: -30,
+        r: 16 + Math.random() * 8,
+        vy: 2 + Math.random() * 2.5,
+        hp: 1,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      });
+    }
+
+    function spawnSparks(x, y, color) {
+      for (let i = 0; i < 12; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 2 + Math.random() * 5;
+        particles.push({
+          x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+          color, life: 1, decay: 0.04
+        });
+      }
+    }
+
+    function loop() {
+      frame++;
+      // Stars background
+      for (let s of stars) {
+        s.y += s.spd;
+        if (s.y > c.height) { s.y = 0; s.x = Math.random() * c.width; }
+      }
+
+      if (!gameOver) {
+        // Auto-fire bullets
+        if (frame % 8 === 0) {
+          bullets.push({ x: ship.x - 10, y: ship.y - 15, vy: -12 });
+          bullets.push({ x: ship.x + 10, y: ship.y - 15, vy: -12 });
+          sfx(880, 'square', 0.04, 0.08);
+        }
+
+        // Spawn enemies
+        if (frame % 45 === 0) spawnEnemy();
+
+        // Update Bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.y += b.vy;
+          if (b.y < -10) bullets.splice(i, 1);
+        }
+
+        // Update Enemies
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const e = enemies[i];
+          e.y += e.vy;
+
+          // Ship collision
+          if (Math.hypot(e.x - ship.x, e.y - ship.y) < e.r + 14) {
+            gameOver = true;
+            sfx(120, 'sawtooth', 0.4, 0.4);
+            spawnSparks(ship.x, ship.y, '#38bdf8');
+          }
+
+          // Bullet hits
+          for (let j = bullets.length - 1; j >= 0; j--) {
+            const b = bullets[j];
+            if (Math.hypot(e.x - b.x, e.y - b.y) < e.r) {
+              bullets.splice(j, 1);
+              e.hp--;
+              if (e.hp <= 0) {
+                spawnSparks(e.x, e.y, e.color);
+                enemies.splice(i, 1);
+                score += 50;
+                document.getElementById('score').textContent = score;
+                sfx(350, 'triangle', 0.09, 0.2);
+              }
+              break;
+            }
+          }
+
+          if (e.y > c.height + 40) enemies.splice(i, 1);
+        }
+      }
+
+      // Drawing
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      // Stars
+      ctx.fillStyle = '#ffffff';
+      for (let s of stars) {
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // Bullets
+      ctx.fillStyle = '#38bdf8';
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 10;
+      for (let b of bullets) {
+        ctx.fillRect(b.x - 2, b.y, 4, 12);
+      }
+      ctx.shadowBlur = 0;
+
+      // Enemies
+      for (let e of enemies) {
+        ctx.fillStyle = e.color;
+        ctx.shadowColor = e.color;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#060913';
+        ctx.beginPath();
+        ctx.arc(e.x - 4, e.y - 2, 3, 0, Math.PI * 2);
+        ctx.arc(e.x + 4, e.y - 2, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+
+      // Player Ship
+      if (!gameOver) {
+        ctx.save();
+        ctx.translate(ship.x, ship.y);
+        ctx.fillStyle = '#38bdf8';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 16;
+        ctx.beginPath();
+        ctx.moveTo(0, -22);
+        ctx.lineTo(18, 16);
+        ctx.lineTo(0, 8);
+        ctx.lineTo(-18, 16);
+        ctx.closePath();
+        ctx.fill();
+        // Thruster flame
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.moveTo(-6, 12);
+        ctx.lineTo(6, 12);
+        ctx.lineTo(0, 22 + Math.random() * 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx; pt.y += pt.vy;
+        pt.life -= pt.decay;
+        if (pt.life <= 0) { particles.splice(i, 1); continue; }
+        ctx.globalAlpha = pt.life;
+        ctx.fillStyle = pt.color;
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = 'bold 30px system-ui';
+        ctx.fillText('SHIP DESTROYED', c.width / 2 - 125, c.height / 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '16px system-ui';
+        ctx.fillText('Tap to Deploy New Fighter', c.width / 2 - 95, c.height / 2 + 35);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    c.addEventListener('click', () => {
+      if (gameOver) {
+        score = 0; gameOver = false;
+        enemies = []; bullets = [];
+        document.getElementById('score').textContent = 0;
+      }
+    });
+
+    loop();
+  </script>
+</body>
+</html>
+

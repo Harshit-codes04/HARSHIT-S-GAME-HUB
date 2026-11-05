@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rock Paper Scissors - Harshit's Game Hub</title>
+  <style>
+    body { background: #0b0e14; color: #fff; font-family: system-ui; text-align: center; margin: 0; padding: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; max-width: 440px; margin: 0 auto 20px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; }
+    .score-board { font-size: 1.4rem; font-weight: bold; margin-bottom: 24px; color: #fbbf24; }
+    .arena { display: flex; justify-content: center; gap: 40px; font-size: 3.5rem; margin-bottom: 30px; }
+    .choice-btns { display: flex; justify-content: center; gap: 14px; }
+    .c-btn { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 14px 20px; font-size: 2.2rem; cursor: pointer; transition: transform 0.2s, border-color 0.2s; }
+    .c-btn:hover { transform: scale(1.1); border-color: #00f2fe; }
+    .result-text { font-size: 1.3rem; font-weight: 800; min-height: 35px; color: #38ef7d; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <h2>✊✋✌️ R.P.S Battle</h2>
+  </header>
+  <div class="score-board">You: <span id="pScore" style="color:#38bdf8">0</span> | AI: <span id="bScore" style="color:#f43f5e">0</span></div>
+  
+  <div class="arena">
+    <div><div>YOU</div><div id="pChoice">❓</div></div>
+    <div><div>AI</div><div id="bChoice">❓</div></div>
+  </div>
+
+  <div class="result-text" id="resultText">Pick your move!</div>
+
+  <div class="choice-btns">
+    <button class="c-btn" onclick="play('rock')">✊</button>
+    <button class="c-btn" onclick="play('paper')">✋</button>
+    <button class="c-btn" onclick="play('scissors')">✌️</button>
+  </div>
+
+  <script>
+    const icons = { rock: '✊', paper: '✋', scissors: '✌️' };
+    const choices = ['rock', 'paper', 'scissors'];
+    let pScore = 0, bScore = 0;
+
+    function play(p) {
+      const b = choices[Math.floor(Math.random() * choices.length)];
+      document.getElementById('pChoice').textContent = icons[p];
+      document.getElementById('bChoice').textContent = icons[b];
+
+      if (p === b) {
+        document.getElementById('resultText').textContent = "It's a Tie!";
+        document.getElementById('resultText').style.color = '#fbbf24';
+      } else if (
+        (p === 'rock' && b === 'scissors') ||
+        (p === 'paper' && b === 'rock') ||
+        (p === 'scissors' && b === 'paper')
+      ) {
+        pScore++;
+        document.getElementById('pScore').textContent = pScore;
+        document.getElementById('resultText').textContent = "You Win Round! 🎉";
+        document.getElementById('resultText').style.color = '#38ef7d';
+      } else {
+        bScore++;
+        document.getElementById('bScore').textContent = bScore;
+        document.getElementById('resultText').textContent = "AI Wins Round! 💥";
+        document.getElementById('resultText').style.color = '#f43f5e';
+      }
+    }
+  </script>
+</body>
+</html>
+

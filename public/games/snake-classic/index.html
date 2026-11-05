@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake Classic - Harshit's Game Hub</title>
+  <style>
+    body { background: #0b0e14; color: #fff; font-family: system-ui; text-align: center; margin: 0; padding: 10px; }
+    header { display: flex; justify-content: space-between; align-items: center; max-width: 440px; margin: 0 auto 10px; flex-wrap: wrap; gap: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; }
+    .mode-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+    .mode-btn.active { background: #0284c7; border-color: #38bdf8; color: #fff; }
+    canvas { background: #111827; border: 4px solid #10b981; border-radius: 10px; box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); touch-action: none; max-width: 100%; height: auto; }
+    .controls { display: grid; grid-template-columns: repeat(3, 60px); gap: 6px; justify-content: center; margin-top: 10px; }
+    .c-btn { width: 60px; height: 50px; background: #1e293b; border: 1px solid #334155; color: #fff; border-radius: 8px; font-size: 1.2rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div>
+      <button class="mode-btn active" id="soloBtn" onclick="setMode('solo')">Solo Score</button>
+      <button class="mode-btn" id="botBtn" onclick="setMode('bot')">🤖 vs AI Snake</button>
+      <button class="mode-btn" id="pvpBtn" onclick="setMode('pvp')">⚔️ 1v1 Battle</button>
+    </div>
+    <div>P1: <strong id="s1" style="color:#10b981">0</strong> <span id="s2Area"></span></div>
+  </header>
+  <canvas id="c" width="400" height="400"></canvas>
+  
+  <div class="controls">
+    <div></div><button class="c-btn" onclick="setDir1(0, -1)">▲</button><div></div>
+    <button class="c-btn" onclick="setDir1(-1, 0)">◀</button>
+    <button class="c-btn" onclick="setDir1(0, 1)">▼</button>
+    <button class="c-btn" onclick="setDir1(1, 0)">▶</button>
+  </div>
+  <p style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">In 1v1: P1 uses Arrows | P2 uses W, A, S, D</p>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d'), grid = 20;
+    let s1 = [{x: 80, y: 200}], d1 = {x: grid, y: 0}, score1 = 0;
+    let s2 = [{x: 300, y: 200}], d2 = {x: -grid, y: 0}, score2 = 0;
+    let food = {x: 200, y: 200}, mode = 'solo';
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('soloBtn').className = m === 'solo' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('botBtn').className = m === 'bot' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('pvpBtn').className = m === 'pvp' ? 'mode-btn active' : 'mode-btn';
+
+      document.getElementById('s2Area').innerHTML = m !== 'solo'
+        ? `| P2: <strong style="color:#f43f5e" id="s2">0</strong>`
+        : '';
+
+      reset();
+    }
+
+    function randFood() {
+      food = {
+        x: Math.floor(Math.random() * (c.width / grid)) * grid,
+        y: Math.floor(Math.random() * (c.height / grid)) * grid
+      };
+    }
+
+    function setDir1(x, y) {
+      if (x !== 0 && d1.x === 0) d1 = {x: x * grid, y: 0};
+      if (y !== 0 && d1.y === 0) d1 = {x: 0, y: y * grid};
+    }
+    function setDir2(x, y) {
+      if (x !== 0 && d2.x === 0) d2 = {x: x * grid, y: 0};
+      if (y !== 0 && d2.y === 0) d2 = {x: 0, y: y * grid};
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp') setDir1(0, -1);
+      if (e.key === 'ArrowDown') setDir1(0, 1);
+      if (e.key === 'ArrowLeft') setDir1(-1, 0);
+      if (e.key === 'ArrowRight') setDir1(1, 0);
+
+      if (mode === 'pvp') {
+        if (e.key === 'w' || e.key === 'W') setDir2(0, -1);
+        if (e.key === 's' || e.key === 'S') setDir2(0, 1);
+        if (e.key === 'a' || e.key === 'A') setDir2(-1, 0);
+        if (e.key === 'd' || e.key === 'D') setDir2(1, 0);
+      }
+    });
+
+    function botAI() {
+      const head = s2[0];
+      const dx = food.x - head.x;
+      const dy = food.y - head.y;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0 && d2.x === 0) d2 = {x: grid, y: 0};
+        else if (dx < 0 && d2.x === 0) d2 = {x: -grid, y: 0};
+        else if (dy > 0 && d2.y === 0) d2 = {x: 0, y: grid};
+        else if (dy < 0 && d2.y === 0) d2 = {x: 0, y: -grid};
+      } else {
+        if (dy > 0 && d2.y === 0) d2 = {x: 0, y: grid};
+        else if (dy < 0 && d2.y === 0) d2 = {x: 0, y: -grid};
+        else if (dx > 0 && d2.x === 0) d2 = {x: grid, y: 0};
+        else if (dx < 0 && d2.x === 0) d2 = {x: -grid, y: 0};
+      }
+    }
+
+    function step() {
+      if (mode === 'bot') botAI();
+
+      // Move P1
+      const h1 = {x: s1[0].x + d1.x, y: s1[0].y + d1.y};
+      if (h1.x < 0) h1.x = c.width - grid;
+      if (h1.x >= c.width) h1.x = 0;
+      if (h1.y < 0) h1.y = c.height - grid;
+      if (h1.y >= c.height) h1.y = 0;
+
+      s1.unshift(h1);
+      if (h1.x === food.x && h1.y === food.y) {
+        score1 += 10; document.getElementById('s1').textContent = score1;
+        randFood();
+      } else {
+        s1.pop();
+      }
+
+      // Move P2/Bot
+      if (mode !== 'solo') {
+        const h2 = {x: s2[0].x + d2.x, y: s2[0].y + d2.y};
+        if (h2.x < 0) h2.x = c.width - grid;
+        if (h2.x >= c.width) h2.x = 0;
+        if (h2.y < 0) h2.y = c.height - grid;
+        if (h2.y >= c.height) h2.y = 0;
+
+        s2.unshift(h2);
+        if (h2.x === food.x && h2.y === food.y) {
+          score2 += 10;
+          const s2Elem = document.getElementById('s2');
+          if (s2Elem) s2Elem.textContent = score2;
+          randFood();
+        } else {
+          s2.pop();
+        }
+      }
+
+      // Render
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.fillStyle = '#ef4444'; ctx.fillRect(food.x, food.y, grid - 2, grid - 2);
+
+      // Draw P1 (Green)
+      s1.forEach((s, idx) => {
+        ctx.fillStyle = idx === 0 ? '#34d399' : '#10b981';
+        ctx.fillRect(s.x, s.y, grid - 2, grid - 2);
+      });
+
+      // Draw P2 (Red)
+      if (mode !== 'solo') {
+        s2.forEach((s, idx) => {
+          ctx.fillStyle = idx === 0 ? '#fb7185' : '#f43f5e';
+          ctx.fillRect(s.x, s.y, grid - 2, grid - 2);
+        });
+      }
+    }
+
+    function reset() {
+      s1 = [{x: 80, y: 200}]; d1 = {x: grid, y: 0}; score1 = 0;
+      s2 = [{x: 300, y: 200}]; d2 = {x: -grid, y: 0}; score2 = 0;
+      document.getElementById('s1').textContent = 0;
+      const s2Elem = document.getElementById('s2');
+      if (s2Elem) s2Elem.textContent = 0;
+      randFood();
+    }
+
+    setInterval(step, 115);
+  </script>
+</body>
+</html>

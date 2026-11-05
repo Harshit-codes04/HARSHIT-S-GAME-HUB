@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dots and Boxes - Harshit's Game Hub</title>
+  <style>
+    body { background: #0b0e14; color: #fff; font-family: system-ui; text-align: center; margin: 0; padding: 12px; }
+    header { display: flex; justify-content: space-between; align-items: center; max-width: 440px; margin: 0 auto 10px; flex-wrap: wrap; gap: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; }
+    .mode-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+    .mode-btn.active { background: #0284c7; border-color: #38bdf8; color: #fff; }
+    canvas { background: #181d28; border: 4px solid #334155; border-radius: 12px; max-width: 100%; height: auto; touch-action: none; }
+    .status { font-size: 1.1rem; font-weight: bold; margin-bottom: 8px; color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div>
+      <button class="mode-btn active" id="botBtn" onclick="setMode('bot')">🤖 vs AI</button>
+      <button class="mode-btn" id="pvpBtn" onclick="setMode('pvp')">⚔️ 1v1 Pass</button>
+      <button class="mode-btn" id="partyBtn" onclick="setMode('party')">👑 4P Party</button>
+    </div>
+    <div>P1: <strong id="p1Score" style="color:#38bdf8">0</strong> | P2: <strong id="p2Score" style="color:#f43f5e">0</strong> <span id="p34Score"></span></div>
+  </header>
+  <div class="status" id="status">Turn: Player 1 (Blue)</div>
+  <canvas id="c" width="380" height="380"></canvas>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d'), N = 4;
+    const spacing = 75, offsetX = 70, offsetY = 70;
+    const colors = { 1: '#38bdf8', 2: '#f43f5e', 3: '#2ecc71', 4: '#f39c12' };
+    let hLines = Array(N).fill(0).map(() => Array(N - 1).fill(0));
+    let vLines = Array(N - 1).fill(0).map(() => Array(N).fill(0));
+    let boxes = Array(N - 1).fill(0).map(() => Array(N - 1).fill(0));
+    let turn = 1, scores = { 1: 0, 2: 0, 3: 0, 4: 0 }, mode = 'bot', totalPlayers = 2;
+
+    function setMode(m) {
+      mode = m;
+      totalPlayers = m === 'party' ? 4 : 2;
+      document.getElementById('botBtn').className = m === 'bot' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('pvpBtn').className = m === 'pvp' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('partyBtn').className = m === 'party' ? 'mode-btn active' : 'mode-btn';
+
+      document.getElementById('p34Score').innerHTML = m === 'party'
+        ? `| P3: <strong style="color:#2ecc71" id="p3Score">0</strong> | P4: <strong style="color:#f39c12" id="p4Score">0</strong>`
+        : '';
+
+      resetGame();
+    }
+
+    function checkBoxes(player) {
+      let made = false;
+      for (let r = 0; r < N - 1; r++) {
+        for (let col = 0; col < N - 1; col++) {
+          if (boxes[r][col] === 0 && hLines[r][col] && hLines[r+1][col] && vLines[r][col] && vLines[r][col+1]) {
+            boxes[r][col] = player;
+            scores[player]++;
+            made = true;
+          }
+        }
+      }
+      document.getElementById('p1Score').textContent = scores[1];
+      document.getElementById('p2Score').textContent = scores[2];
+      if (mode === 'party') {
+        document.getElementById('p3Score').textContent = scores[3];
+        document.getElementById('p4Score').textContent = scores[4];
+      }
+      return made;
+    }
+
+    function isBoardFull() {
+      return boxes.every(row => row.every(b => b !== 0));
+    }
+
+    c.onclick = (e) => {
+      if (mode === 'bot' && turn === 2) return;
+      const rect = c.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (c.width / rect.width);
+      const y = (e.clientY - rect.top) * (c.height / rect.height);
+
+      let played = false;
+      for (let r = 0; r < N; r++) {
+        for (let col = 0; col < N - 1; col++) {
+          const lx = offsetX + col * spacing, ly = offsetY + r * spacing;
+          if (x >= lx && x <= lx + spacing && Math.abs(y - ly) < 14 && !hLines[r][col]) {
+            hLines[r][col] = turn; played = true;
+          }
+        }
+      }
+      if (!played) {
+        for (let r = 0; r < N - 1; r++) {
+          for (let col = 0; col < N; col++) {
+            const lx = offsetX + col * spacing, ly = offsetY + r * spacing;
+            if (y >= ly && y <= ly + spacing && Math.abs(x - lx) < 14 && !vLines[r][col]) {
+              vLines[r][col] = turn; played = true;
+            }
+          }
+        }
+      }
+
+      if (played) {
+        const bonus = checkBoxes(turn);
+        if (isBoardFull()) {
+          document.getElementById('status').textContent = "Match Finished!";
+        } else if (!bonus) {
+          turn = (turn % totalPlayers) + 1;
+          updateTurnDisplay();
+          if (mode === 'bot' && turn === 2) {
+            setTimeout(botPlay, 450);
+          }
+        }
+        draw();
+      }
+    };
+
+    function botPlay() {
+      let options = [];
+      for (let r = 0; r < N; r++) for (let col = 0; col < N - 1; col++) if (!hLines[r][col]) options.push({type:'h', r, col});
+      for (let r = 0; r < N - 1; r++) for (let col = 0; col < N; col++) if (!vLines[r][col]) options.push({type:'v', r, col});
+      if (options.length === 0) return;
+
+      const pick = options[Math.floor(Math.random() * options.length)];
+      if (pick.type === 'h') hLines[pick.r][pick.col] = 2;
+      else vLines[pick.r][pick.col] = 2;
+
+      const bonus = checkBoxes(2);
+      if (isBoardFull()) {
+        document.getElementById('status').textContent = "Match Finished!";
+      } else if (bonus) {
+        setTimeout(botPlay, 300);
+      } else {
+        turn = 1;
+        updateTurnDisplay();
+      }
+      draw();
+    }
+
+    function updateTurnDisplay() {
+      const names = { 1: 'Player 1 (Blue)', 2: (mode==='bot'?'AI Bot':'Player 2 (Red)'), 3: 'Player 3 (Green)', 4: 'Player 4 (Yellow)' };
+      document.getElementById('status').textContent = `Turn: ${names[turn]}`;
+      document.getElementById('status').style.color = colors[turn];
+    }
+
+    function resetGame() {
+      hLines = Array(N).fill(0).map(() => Array(N - 1).fill(0));
+      vLines = Array(N - 1).fill(0).map(() => Array(N).fill(0));
+      boxes = Array(N - 1).fill(0).map(() => Array(N - 1).fill(0));
+      scores = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      turn = 1;
+      document.getElementById('p1Score').textContent = 0;
+      document.getElementById('p2Score').textContent = 0;
+      updateTurnDisplay();
+      draw();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      for (let r = 0; r < N - 1; r++) {
+        for (let col = 0; col < N - 1; col++) {
+          if (boxes[r][col]) {
+            ctx.fillStyle = colors[boxes[r][col]] + '55';
+            ctx.fillRect(offsetX + col * spacing, offsetY + r * spacing, spacing, spacing);
+          }
+        }
+      }
+
+      for (let r = 0; r < N; r++) {
+        for (let col = 0; col < N - 1; col++) {
+          ctx.strokeStyle = hLines[r][col] ? colors[hLines[r][col]] : 'rgba(255,255,255,0.1)';
+          ctx.lineWidth = hLines[r][col] ? 5 : 2;
+          ctx.beginPath();
+          ctx.moveTo(offsetX + col * spacing, offsetY + r * spacing);
+          ctx.lineTo(offsetX + (col + 1) * spacing, offsetY + r * spacing);
+          ctx.stroke();
+        }
+      }
+
+      for (let r = 0; r < N - 1; r++) {
+        for (let col = 0; col < N; col++) {
+          ctx.strokeStyle = vLines[r][col] ? colors[vLines[r][col]] : 'rgba(255,255,255,0.1)';
+          ctx.lineWidth = vLines[r][col] ? 5 : 2;
+          ctx.beginPath();
+          ctx.moveTo(offsetX + col * spacing, offsetY + r * spacing);
+          ctx.lineTo(offsetX + col * spacing, offsetY + (r + 1) * spacing);
+          ctx.stroke();
+        }
+      }
+
+      for (let r = 0; r < N; r++) {
+        for (let col = 0; col < N; col++) {
+          ctx.fillStyle = '#f8fafc';
+          ctx.beginPath();
+          ctx.arc(offsetX + col * spacing, offsetY + r * spacing, 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    draw();
+  </script>
+</body>
+</html>

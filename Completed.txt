@@ -1,0 +1,45 @@
+============================================================
+HARSHIT'S GAME HUB - COMPLETED & FULLY PLAYABLE GAMES (25)
+============================================================
+
+1. Action
+   - 🖊️ Pen Fight (url: /games/pen-fight/) - Physics 2D Desk Battle with 4 Arenas & Store
+   - 🏒 Air Hockey Pro (url: /games/air-hockey/) - Fast Neon Puck Striker vs Computer or 2P
+   - 🛡️ Tank Battle 1990 (url: /games/tank-trouble/) - Ricochet bullet tank brawl in dynamic maze
+   - 🚀 Galaxy Defender (url: /games/space-blaster/) - Shoot incoming alien waves and meteors
+
+2. Multiplayer & 2-Player
+   - ❌⭕ Tic-Tac-Toe Pro (url: /games/tic-tac-toe/) - Auto-reset board with live score tracking
+   - 🔲 Dots & Boxes (url: /games/dots-and-boxes/) - Notebook grid territory capture up to 4 players
+   - 🏓 Retro Pong (url: /games/pong-paddle/) - Classic 80s Bouncing Paddle Tennis
+   - ⚡ Speed Reflex (url: /games/speed-tap/) - Head-to-head reaction time duel on one screen
+   - 🔴🟡 Connect 4 Pro (url: /games/connect-four/) - Drop colored tokens to connect 4 in a row
+   - ⚪⚫ Checkers Pro (url: /games/checkers/) - Diagonal king jump checkers board game
+
+3. Arcade
+   - 🐥 Flappy Wings (url: /games/flappy-bird/) - Tap to flap through pipe obstacles
+   - 🐍 Retro Snake (url: /games/snake-classic/) - Nokia retro snake with dual player & AI battle
+   - 🧱 Brick Breaker Pro (url: /games/brick-breaker/) - Bounce silver ball to shatter colored bricks
+   - 🟡 Chomp Pac Maze (url: /games/pac-maze/) - Eat all glowing dots while escaping ghosts
+   
+   
+   - 👾 Alien Space Invaders (url: /games/space-invaders/) - Defend city shields against marching aliens
+   - 🍉 Fruit Ninja Slice (url: /games/fruit-slice/) - Slice flying watermelons and dodge bombs
+
+4. Puzzle
+   - 🃏 Memory Cards (url: /games/memory-cards/) - Flip & match emoji pairs against moves counter
+   - 🔢 2048 Classic (url: /games/game-2048/) - Slide and merge numbers to create 2048 tile
+   - 💣 Minesweeper Pro (url: /games/minesweeper/) - Deduce hidden bomb locations with numbered clues
+
+5. Racing & Sports
+   - ⚽ Penalty Kick 2026 (url: /games/penalty-shootout/) - Curling shootouts against acrobatic goalkeeper
+
+6. Board & Card
+   - ♟️ Speed Chess 8x8 (url: /games/chess/) - Checkmate opponent king with tactical moves
+   - ⚪ Pocket Carrom (url: /games/carrom/) - Strike and pocket white, black and queen carrom men
+
+7. Casual & Strategy
+   - ✊ R.P.S Arena (url: /games/rock-paper-scissors/) - Best of 5 rounds Rock-Paper-Scissors clash
+   - 🐹 Whack-A-Mole (url: /games/whack-a-mole/) - Hammer mischievous moles popping out of burrows
+   - 🎹 Piano Magic Tiles (url: /games/piano-tiles/) - Tap descending black piano tiles to play melody
+

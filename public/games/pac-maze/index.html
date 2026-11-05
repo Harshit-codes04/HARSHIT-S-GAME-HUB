@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chomp Pac Maze - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body { background: #060913; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+    header { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 460px; margin-bottom: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; }
+    .score-box { background: #0f172a; border: 1px solid #1e293b; padding: 5px 14px; border-radius: 8px; font-weight: 900; color: #facc15; }
+    canvas { background: #000; border: 4px solid #1e3a8a; border-radius: 14px; box-shadow: 0 0 25px rgba(30, 58, 138, 0.6); touch-action: none; max-width: 100%; height: auto; }
+    .dpad { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(2, 48px); gap: 4px; margin-top: 10px; }
+    .d-btn { background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 8px; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="score-box">🟡 Score: <b id="score">0</b></div>
+  </header>
+
+  <canvas id="c" width="440" height="440"></canvas>
+
+  <div class="dpad">
+    <div></div>
+    <button class="d-btn" onclick="setDir(0, -1)">⬆️</button>
+    <div></div>
+    <button class="d-btn" onclick="setDir(-1, 0)">⬅️</button>
+    <button class="d-btn" onclick="setDir(0, 1)">⬇️</button>
+    <button class="d-btn" onclick="setDir(1, 0)">➡️</button>
+  </div>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    let score = 0, gameOver = false;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function sfx(freq) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + 0.05);
+      } catch(e) {}
+    }
+
+    const grid = [
+      "11111111111",
+      "1.0.0.1.0.1",
+      "1.111.1.1.1",
+      "1.0.0.0.0.1",
+      "1.1.111.1.1",
+      "1.0.0.0.0.1",
+      "111.1.1.111",
+      "1.0.0.1.0.1",
+      "1.111.0.1.1",
+      "1.0.0.0.0.1",
+      "11111111111"
+    ];
+
+    const TILE = 40;
+    const dots = [];
+    for (let r = 0; r < 11; r++) {
+      for (let cl = 0; cl < 11; cl++) {
+        if (grid[r][cl] === '0' || grid[r][cl] === '.') {
+          dots.push({ x: cl * TILE + 20, y: r * TILE + 20, alive: true });
+        }
+      }
+    }
+
+    const pac = { x: 60, y: 60, vx: 0, vy: 0, r: 14, angle: 0 };
+    const ghost = { x: 380, y: 380, vx: -2, vy: 0, r: 14, color: '#f43f5e' };
+
+    function setDir(dx, dy) {
+      pac.vx = dx * 2.8;
+      pac.vy = dy * 2.8;
+      pac.angle = Math.atan2(dy, dx);
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp') setDir(0, -1);
+      if (e.key === 'ArrowDown') setDir(0, 1);
+      if (e.key === 'ArrowLeft') setDir(-1, 0);
+      if (e.key === 'ArrowRight') setDir(1, 0);
+    });
+
+    function isWall(x, y) {
+      const col = Math.floor(x / TILE);
+      const row = Math.floor(y / TILE);
+      if (row < 0 || row >= 11 || col < 0 || col >= 11) return true;
+      return grid[row][col] === '1';
+    }
+
+    function loop() {
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      if (!gameOver) {
+        // Move pacman
+        const nx = pac.x + pac.vx;
+        const ny = pac.y + pac.vy;
+        if (!isWall(nx + Math.sign(pac.vx) * pac.r, pac.y)) pac.x = nx;
+        if (!isWall(pac.x, ny + Math.sign(pac.vy) * pac.r)) pac.y = ny;
+
+        // Eat dots
+        for (let d of dots) {
+          if (d.alive && Math.hypot(pac.x - d.x, pac.y - d.y) < pac.r + 6) {
+            d.alive = false;
+            score += 10;
+            document.getElementById('score').textContent = score;
+            sfx(540);
+          }
+        }
+
+        // Ghost AI
+        const gnx = ghost.x + ghost.vx;
+        const gny = ghost.y + ghost.vy;
+        if (isWall(gnx + Math.sign(ghost.vx) * ghost.r, ghost.y) || Math.random() < 0.02) {
+          ghost.vx = (pac.x > ghost.x ? 1.8 : -1.8);
+        } else {
+          ghost.x = gnx;
+        }
+        if (isWall(ghost.x, gny + Math.sign(ghost.vy) * ghost.r) || Math.random() < 0.02) {
+          ghost.vy = (pac.y > ghost.y ? 1.8 : -1.8);
+        } else {
+          ghost.y = gny;
+        }
+
+        // Catch check
+        if (Math.hypot(pac.x - ghost.x, pac.y - ghost.y) < pac.r + ghost.r) {
+          gameOver = true;
+          sfx(160);
+        }
+      }
+
+      // Draw Walls
+      ctx.fillStyle = '#1e3a8a';
+      for (let r = 0; r < 11; r++) {
+        for (let cl = 0; cl < 11; cl++) {
+          if (grid[r][cl] === '1') {
+            ctx.fillRect(cl * TILE, r * TILE, TILE, TILE);
+          }
+        }
+      }
+
+      // Draw Dots
+      ctx.fillStyle = '#fde047';
+      for (let d of dots) {
+        if (d.alive) {
+          ctx.beginPath(); ctx.arc(d.x, d.y, 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // Draw Pacman
+      ctx.save();
+      ctx.translate(pac.x, pac.y);
+      ctx.rotate(pac.angle);
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(0, 0, pac.r, 0.25 * Math.PI, 1.75 * Math.PI);
+      ctx.lineTo(0, 0);
+      ctx.fill();
+      ctx.restore();
+
+      // Draw Ghost
+      ctx.fillStyle = ghost.color;
+      ctx.beginPath();
+      ctx.arc(ghost.x, ghost.y - 2, ghost.r, Math.PI, 0, false);
+      ctx.lineTo(ghost.x + ghost.r, ghost.y + ghost.r);
+      ctx.lineTo(ghost.x - ghost.r, ghost.y + ghost.r);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(ghost.x - 4, ghost.y - 2, 3, 0, Math.PI * 2);
+      ctx.arc(ghost.x + 4, ghost.y - 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = 'bold 30px system-ui';
+        ctx.fillText('CAUGHT BY GHOST', c.width / 2 - 130, c.height / 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '16px system-ui';
+        ctx.fillText('Tap to Restart Maze', c.width / 2 - 70, c.height / 2 + 35);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    c.addEventListener('click', () => {
+      if (gameOver) {
+        score = 0; gameOver = false;
+        pac.x = 60; pac.y = 60; pac.vx = 0; pac.vy = 0;
+        dots.forEach(d => d.alive = true);
+      }
+    });
+
+    loop();
+  </script>
+</body>
+</html>
+

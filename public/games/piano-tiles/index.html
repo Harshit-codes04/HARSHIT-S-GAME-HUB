@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Piano Magic Tiles - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body { background: #060913; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+    header { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 440px; margin-bottom: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; }
+    .score-box { background: #0f172a; border: 1px solid #1e293b; padding: 5px 14px; border-radius: 8px; font-weight: 900; color: #facc15; }
+    canvas { background: #111827; border: 4px solid #1e293b; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); touch-action: none; max-width: 100%; height: auto; }
+    .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="score-box">🎹 Score: <b id="score">0</b></div>
+  </header>
+
+  <canvas id="c" width="400" height="580"></canvas>
+  <div class="hint">Tap descending black piano tiles to play melody! Don't let them hit the bottom!</div>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    let score = 0, gameOver = false, speed = 3.6;
+
+    // Web Audio Synthesizer Piano Notes
+    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playNote(freq) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        g.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + 0.35);
+      } catch(e) {}
+    }
+
+    const laneW = c.width / 4;
+    const tileH = 120;
+    let tiles = [];
+
+    function spawnRow(y) {
+      const col = Math.floor(Math.random() * 4);
+      tiles.push({ col, y, h: tileH, hit: false, note: notes[Math.floor(Math.random() * notes.length)] });
+    }
+
+    function initGame() {
+      score = 0; gameOver = false; tiles = []; speed = 3.6;
+      document.getElementById('score').textContent = 0;
+      for (let i = 0; i < 4; i++) {
+        spawnRow(c.height - 150 - i * tileH);
+      }
+    }
+
+    c.addEventListener('pointerdown', e => {
+      if (gameOver) { initGame(); return; }
+      const rect = c.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (c.width / rect.width);
+      const y = (e.clientY - rect.top) * (c.height / rect.height);
+      const col = Math.floor(x / laneW);
+
+      let tappedTile = false;
+      for (let t of tiles) {
+        if (!t.hit && t.col === col && y >= t.y && y <= t.y + t.h) {
+          t.hit = true;
+          tappedTile = true;
+          score += 10;
+          document.getElementById('score').textContent = score;
+          playNote(t.note);
+          speed += 0.05;
+          break;
+        }
+      }
+
+      if (!tappedTile && y > 100) {
+        // Tapped empty lane = fail
+        gameOver = true;
+      }
+    });
+
+    function loop() {
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      // Lane dividers
+      ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2;
+      for (let i = 1; i < 4; i++) {
+        ctx.beginPath(); ctx.moveTo(i * laneW, 0); ctx.lineTo(i * laneW, c.height); ctx.stroke();
+      }
+
+      if (!gameOver) {
+        // Move tiles down
+        for (let t of tiles) {
+          t.y += speed;
+          if (t.y > c.height) {
+            if (!t.hit) gameOver = true;
+          }
+        }
+
+        // Spawn new tile when top tile moves down
+        const topY = Math.min(...tiles.map(t => t.y));
+        if (topY > -tileH) {
+          spawnRow(topY - tileH);
+        }
+
+        tiles = tiles.filter(t => t.y <= c.height + 20);
+      }
+
+      // Draw Tiles
+      for (let t of tiles) {
+        ctx.fillStyle = t.hit ? '#38bdf8' : '#000000';
+        ctx.fillRect(t.col * laneW + 4, t.y + 4, laneW - 8, t.h - 8);
+        ctx.strokeStyle = t.hit ? '#fff' : '#334155';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(t.col * laneW + 4, t.y + 4, laneW - 8, t.h - 8);
+      }
+
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = 'bold 30px system-ui';
+        ctx.fillText('MISSED TILE', c.width / 2 - 90, c.height / 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '16px system-ui';
+        ctx.fillText('Tap to Play Again', c.width / 2 - 60, c.height / 2 + 35);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    initGame();
+    loop();
+  </script>
+</body>
+</html>
+

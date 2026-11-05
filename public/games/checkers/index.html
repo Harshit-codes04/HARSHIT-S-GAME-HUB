@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Checkers Pro - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body { background: #060913; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+    header { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 460px; margin-bottom: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; }
+    .modes { display: flex; gap: 4px; background: #111827; padding: 3px; border-radius: 8px; }
+    .m-btn { background: transparent; border: none; color: #94a3b8; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
+    .m-btn.active { background: #0284c7; color: #fff; }
+    .status { background: #0f172a; border: 1px solid #1e293b; padding: 6px 14px; border-radius: 8px; font-weight: 900; color: #facc15; margin-bottom: 8px; }
+    .board { display: grid; grid-template-columns: repeat(8, 48px); grid-template-rows: repeat(8, 48px); border: 4px solid #78350f; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    @media (max-width: 420px) {
+      .board { grid-template-columns: repeat(8, 40px); grid-template-rows: repeat(8, 40px); }
+    }
+    .sq { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+    .sq.light { background: #fed7aa; }
+    .sq.dark { background: #78350f; }
+    .sq.highlight { background: #0284c7 !important; cursor: pointer; }
+    .piece { width: 80%; height: 80%; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.6); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 900; transition: transform 0.1s; }
+    .piece.red { background: radial-gradient(circle at 35% 35%, #f87171, #dc2626); border: 2px solid #b91c1c; }
+    .piece.black { background: radial-gradient(circle at 35% 35%, #64748b, #0f172a); border: 2px solid #334155; }
+    .piece.selected { transform: scale(1.15); box-shadow: 0 0 15px #38bdf8; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="modes">
+      <button class="m-btn active" id="bBtn" onclick="setMode('bot')">🤖 vs Bot</button>
+      <button class="m-btn" id="pBtn" onclick="setMode('pvp')">⚔️ 1v1 Local</button>
+    </div>
+  </header>
+
+  <div class="status" id="status">🔴 Red's Turn to Move</div>
+  <div class="board" id="board"></div>
+
+  <script>
+    const ROWS = 8, COLS = 8;
+    let grid = Array.from({ length: 8 }, () => Array(8).fill(null));
+    let turn = 'red'; // red (player 1) moves UP (-1), black (player 2 / AI) moves DOWN (+1)
+    let selected = null;
+    let validMoves = [];
+    let mode = 'bot';
+
+    function init() {
+      grid = Array.from({ length: 8 }, () => Array(8).fill(null));
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          if ((r + c) % 2 === 1) {
+            if (r < 3) grid[r][c] = { color: 'black', king: false };
+            else if (r > 4) grid[r][c] = { color: 'red', king: false };
+          }
+        }
+      }
+      turn = 'red';
+      selected = null;
+      validMoves = [];
+      updateStatus();
+      render();
+    }
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('bBtn').className = m === 'bot' ? 'm-btn active' : 'm-btn';
+      document.getElementById('pBtn').className = m === 'pvp' ? 'm-btn active' : 'm-btn';
+      init();
+    }
+
+    function updateStatus() {
+      const el = document.getElementById('status');
+      if (turn === 'red') el.innerHTML = `🔴 <span style="color:#ef4444">Red's Turn</span>`;
+      else el.innerHTML = mode === 'bot' ? `🤖 <span style="color:#38bdf8">AI Bot Thinking...</span>` : `⚫ <span style="color:#94a3b8">Black's Turn</span>`;
+    }
+
+    function render() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const sq = document.createElement('div');
+          sq.className = 'sq ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
+
+          const isHighlight = validMoves.some(m => m.r === r && m.c === c);
+          if (isHighlight) {
+            sq.classList.add('highlight');
+            sq.onclick = () => doMove(r, c);
+          }
+
+          const piece = grid[r][c];
+          if (piece) {
+            const pDiv = document.createElement('div');
+            pDiv.className = `piece ${piece.color}` + (selected && selected.r === r && selected.c === c ? ' selected' : '');
+            if (piece.king) pDiv.textContent = '👑';
+            pDiv.onclick = (e) => {
+              e.stopPropagation();
+              onPieceClick(r, c);
+            };
+            sq.appendChild(pDiv);
+          }
+          boardEl.appendChild(sq);
+        }
+      }
+    }
+
+    function onPieceClick(r, c) {
+      if (mode === 'bot' && turn === 'black') return;
+      const piece = grid[r][c];
+      if (!piece || piece.color !== turn) return;
+
+      selected = { r, c };
+      validMoves = getMoves(r, c, piece);
+      render();
+    }
+
+    function getMoves(r, c, piece) {
+      const moves = [];
+      const dirs = piece.king ? [-1, 1] : piece.color === 'red' ? [-1] : [1];
+
+      for (let dr of dirs) {
+        for (let dc of [-1, 1]) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            if (!grid[nr][nc]) {
+              moves.push({ r: nr, c: nc });
+            } else if (grid[nr][nc].color !== piece.color) {
+              const jr = nr + dr, jc = nc + dc;
+              if (jr >= 0 && jr < 8 && jc >= 0 && jc < 8 && !grid[jr][jc]) {
+                moves.push({ r: jr, c: jc, jump: { r: nr, c: nc } });
+              }
+            }
+          }
+        }
+      }
+      return moves;
+    }
+
+    function doMove(toR, toC) {
+      const move = validMoves.find(m => m.r === toR && m.c === toC);
+      if (!move || !selected) return;
+
+      const piece = grid[selected.r][selected.c];
+      grid[toR][toC] = piece;
+      grid[selected.r][selected.c] = null;
+
+      if (move.jump) {
+        grid[move.jump.r][move.jump.c] = null;
+      }
+
+      // King promotion
+      if (piece.color === 'red' && toR === 0) piece.king = true;
+      if (piece.color === 'black' && toR === 7) piece.king = true;
+
+      selected = null;
+      validMoves = [];
+      turn = turn === 'red' ? 'black' : 'red';
+      updateStatus();
+      render();
+
+      if (mode === 'bot' && turn === 'black') {
+        setTimeout(botTurn, 450);
+      }
+    }
+
+    function botTurn() {
+      const botPieces = [];
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          if (grid[r][c] && grid[r][c].color === 'black') {
+            const mvs = getMoves(r, c, grid[r][c]);
+            if (mvs.length > 0) botPieces.push({ r, c, mvs });
+          }
+        }
+      }
+      if (botPieces.length === 0) {
+        alert('🎉 RED WINS THE CHECKERS MATCH!');
+        init();
+        return;
+      }
+
+      // Prioritize jumps
+      const jumps = [];
+      botPieces.forEach(bp => {
+        bp.mvs.forEach(m => {
+          if (m.jump) jumps.push({ from: { r: bp.r, c: bp.c }, to: m });
+        });
+      });
+
+      if (jumps.length > 0) {
+        const choice = jumps[Math.floor(Math.random() * jumps.length)];
+        selected = choice.from;
+        validMoves = [choice.to];
+        doMove(choice.to.r, choice.to.c);
+      } else {
+        const choicePiece = botPieces[Math.floor(Math.random() * botPieces.length)];
+        const choiceMove = choicePiece.mvs[Math.floor(Math.random() * choicePiece.mvs.length)];
+        selected = { r: choicePiece.r, c: choicePiece.c };
+        validMoves = [choiceMove];
+        doMove(choiceMove.r, choiceMove.c);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
+

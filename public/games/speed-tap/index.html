@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speed Reflex Tap - Harshit's Game Hub</title>
+  <style>
+    body { background: #0b0e14; color: #fff; font-family: system-ui; text-align: center; margin: 0; padding: 12px; user-select: none; }
+    header { display: flex; justify-content: space-between; align-items: center; max-width: 440px; margin: 0 auto 12px; flex-wrap: wrap; gap: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; }
+    .mode-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+    .mode-btn.active { background: #0284c7; border-color: #38bdf8; color: #fff; }
+    .duel-arena { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 400px; margin: 0 auto; }
+    .tap-box { width: 100%; height: 180px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 900; cursor: pointer; transition: background 0.15s; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+    .single-box { width: 340px; height: 340px; border-radius: 20px; margin: 0 auto; }
+    .wait { background: #dc2626; }
+    .tap { background: #16a34a; }
+    .ready { background: #2563eb; }
+    .winner { background: #f59e0b; color: #0b1329; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div>
+      <button class="mode-btn active" id="soloBtn" onclick="setMode('solo')">Solo Test</button>
+      <button class="mode-btn" id="duelBtn" onclick="setMode('duel')">⚔️ 2P Split-Screen</button>
+    </div>
+    <div style="font-size:0.9rem; font-weight:bold;">⚡ Reflex Tap</div>
+  </header>
+
+  <!-- Solo Arena -->
+  <div id="soloArea">
+    <div class="tap-box single-box ready" id="box">
+      <div id="msg">TAP TO START</div>
+      <div id="ms" style="font-size:1.8rem; margin-top:8px;"></div>
+    </div>
+    <div style="margin-top:14px; color:#fbbf24; font-weight:bold;">Best: <span id="best">---</span> ms</div>
+  </div>
+
+  <!-- 2P Split Screen Duel Arena -->
+  <div class="duel-arena" id="duelArea" style="display:none;">
+    <div class="tap-box ready" id="p2Box" style="transform: rotate(180deg);">
+      <div>PLAYER 2 (RED)</div>
+      <small style="font-size:0.8rem;">Tap when green!</small>
+    </div>
+
+    <div class="tap-box ready" id="p1Box">
+      <div>PLAYER 1 (BLUE)</div>
+      <small style="font-size:0.8rem;">Tap when green!</small>
+    </div>
+  </div>
+
+  <script>
+    let mode = 'solo', state = 'idle', timer, startTime;
+    const box = document.getElementById('box'), msg = document.getElementById('msg'), ms = document.getElementById('ms'), bestElem = document.getElementById('best');
+    const p1Box = document.getElementById('p1Box'), p2Box = document.getElementById('p2Box');
+    let bestTime = localStorage.getItem('speed_tap_best') || null;
+    if (bestTime) bestElem.textContent = bestTime;
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('soloBtn').className = m === 'solo' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('duelBtn').className = m === 'duel' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('soloArea').style.display = m === 'solo' ? 'block' : 'none';
+      document.getElementById('duelArea').style.display = m === 'duel' ? 'flex' : 'none';
+      resetDuel();
+    }
+
+    // Solo Mode logic
+    box.onclick = () => {
+      if (state === 'idle') {
+        state = 'waiting';
+        box.className = 'tap-box single-box wait';
+        msg.textContent = 'WAIT FOR GREEN...';
+        ms.textContent = '';
+        timer = setTimeout(() => {
+          state = 'tap';
+          box.className = 'tap-box single-box tap';
+          msg.textContent = 'TAP NOW!';
+          startTime = performance.now();
+        }, Math.random() * 2500 + 1500);
+      } else if (state === 'waiting') {
+        clearTimeout(timer);
+        state = 'idle';
+        box.className = 'tap-box single-box ready';
+        msg.textContent = 'TOO SOON! ❌';
+        ms.textContent = 'Tap to try again';
+      } else if (state === 'tap') {
+        const reaction = Math.round(performance.now() - startTime);
+        state = 'idle';
+        box.className = 'tap-box single-box ready';
+        msg.textContent = `${reaction} ms!`;
+        ms.textContent = 'Tap to play again';
+        if (!bestTime || reaction < bestTime) {
+          bestTime = reaction;
+          localStorage.setItem('speed_tap_best', bestTime);
+          bestElem.textContent = bestTime;
+        }
+      }
+    };
+
+    // 2P Duel Logic
+    let duelState = 'idle', duelTimer;
+    function startDuelRound() {
+      duelState = 'waiting';
+      p1Box.className = 'tap-box wait';
+      p2Box.className = 'tap-box wait';
+      p1Box.innerHTML = '<div>WAIT FOR GREEN...</div>';
+      p2Box.innerHTML = '<div>WAIT FOR GREEN...</div>';
+
+      duelTimer = setTimeout(() => {
+        duelState = 'tap';
+        p1Box.className = 'tap-box tap';
+        p2Box.className = 'tap-box tap';
+        p1Box.innerHTML = '<div>⚡ TAP NOW!</div>';
+        p2Box.innerHTML = '<div>⚡ TAP NOW!</div>';
+      }, Math.random() * 2500 + 1500);
+    }
+
+    function handleDuelTap(pNum) {
+      if (duelState === 'idle') {
+        startDuelRound();
+      } else if (duelState === 'waiting') {
+        clearTimeout(duelTimer);
+        duelState = 'idle';
+        p1Box.className = 'tap-box ready';
+        p2Box.className = 'tap-box ready';
+        const foulBox = pNum === 1 ? p1Box : p2Box;
+        foulBox.innerHTML = `<div>FOUL! Too Soon ❌</div><small>Tap to retry</small>`;
+      } else if (duelState === 'tap') {
+        duelState = 'idle';
+        p1Box.className = pNum === 1 ? 'tap-box winner' : 'tap-box ready';
+        p2Box.className = pNum === 2 ? 'tap-box winner' : 'tap-box ready';
+        const winBox = pNum === 1 ? p1Box : p2Box;
+        const loseBox = pNum === 1 ? p2Box : p1Box;
+        winBox.innerHTML = `<div>👑 PLAYER ${pNum} WINS!</div><small>Tap for next round</small>`;
+        loseBox.innerHTML = `<div>TOO SLOW!</div><small>Tap for next round</small>`;
+      }
+    }
+
+    p1Box.onclick = () => handleDuelTap(1);
+    p2Box.onclick = () => handleDuelTap(2);
+
+    function resetDuel() {
+      duelState = 'idle';
+      p1Box.className = 'tap-box ready';
+      p2Box.className = 'tap-box ready';
+      p1Box.innerHTML = '<div>PLAYER 1 (BLUE)</div><small>Tap when green!</small>';
+      p2Box.innerHTML = '<div>PLAYER 2 (RED)</div><small>Tap when green!</small>';
+    }
+  </script>
+</body>
+</html>

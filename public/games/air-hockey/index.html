@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Air Hockey Pro - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      background: #060913;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 8px;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .back-btn {
+      background: #1e293b;
+      color: #38bdf8;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      transition: all 0.2s;
+    }
+    .back-btn:hover { background: #38bdf8; color: #0f172a; }
+
+    .modes-group {
+      display: flex;
+      gap: 4px;
+      background: #111827;
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 700;
+      transition: all 0.2s;
+    }
+    .mode-btn.active {
+      background: #0284c7;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(2, 132, 199, 0.5);
+    }
+
+    .difficulty-select {
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .score-board {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #0f172a;
+      padding: 4px 14px;
+      border-radius: 10px;
+      border: 1px solid #1e293b;
+      font-weight: 900;
+      font-size: 1.3rem;
+      letter-spacing: 1px;
+    }
+    .score-red { color: #f43f5e; text-shadow: 0 0 8px rgba(244, 63, 94, 0.6); }
+    .score-blue { color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.6); }
+    .score-div { color: #64748b; font-size: 1rem; }
+
+    .game-container {
+      position: relative;
+      display: inline-block;
+      touch-action: none;
+      max-width: 100%;
+    }
+
+    canvas {
+      display: block;
+      background: #050b14;
+      border-radius: 24px;
+      box-shadow: 0 0 35px rgba(2, 132, 199, 0.25), 0 10px 40px rgba(0, 0, 0, 0.8);
+      touch-action: none;
+      border: 6px solid #1e293b;
+    }
+
+    .banner-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: rgba(15, 23, 42, 0.95);
+      border: 2px solid #38bdf8;
+      padding: 18px 30px;
+      border-radius: 16px;
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.5);
+      font-size: 2rem;
+      font-weight: 900;
+      color: #fff;
+      pointer-events: none;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+      opacity: 0;
+      z-index: 20;
+    }
+    .banner-overlay.show {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    .instructions {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 8px;
+      max-width: 480px;
+      line-height: 1.4;
+    }
+    .instructions span { color: #38bdf8; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    
+    <div class="modes-group">
+      <button class="mode-btn active" id="botBtn" onclick="setMode('bot')">🤖 vs Bot</button>
+      <button class="mode-btn" id="pvpBtn" onclick="setMode('pvp')">⚔️ 1v1 Local</button>
+      <button class="mode-btn" id="onlineBtn" onclick="promptOnlineRoom()">🌐 Online Room</button>
+    </div>
+
+    <select class="difficulty-select" id="botDiff" onchange="changeDiff(this.value)">
+      <option value="easy">Easy Bot</option>
+      <option value="med" selected>Medium Bot</option>
+      <option value="hard">Hard Bot</option>
+      <option value="insane">Pro Bot</option>
+    </select>
+
+    <div class="score-board">
+      <span class="score-red" id="bScore">0</span>
+      <span class="score-div">:</span>
+      <span class="score-blue" id="pScore">0</span>
+    </div>
+  </header>
+
+  <div class="game-container">
+    <canvas id="c" width="460" height="700"></canvas>
+    <div id="goalBanner" class="banner-overlay">GOAL! 💥</div>
+  </div>
+
+  <div class="instructions" id="hint">
+    <span>Player 1 (Blue)</span> controls bottom half • Drag fast to strike puck with momentum! First to 7 wins.
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Audio Context Synthesizer (Zero asset dependency)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(freq, type = 'sine', duration = 0.08, vol = 0.2) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    function soundHit(force = 1) {
+      const freq = Math.min(600, 240 + force * 15);
+      playBeep(freq, 'triangle', 0.07, Math.min(0.35, 0.15 + force * 0.015));
+    }
+    function soundWall() { playBeep(180, 'sine', 0.05, 0.12); }
+    function soundGoal() {
+      playBeep(440, 'sawtooth', 0.15, 0.3);
+      setTimeout(() => playBeep(587, 'sawtooth', 0.15, 0.3), 100);
+      setTimeout(() => playBeep(880, 'sawtooth', 0.35, 0.4), 220);
+    }
+    function soundWin() {
+      playBeep(523, 'sine', 0.2, 0.3);
+      setTimeout(() => playBeep(659, 'sine', 0.2, 0.3), 150);
+      setTimeout(() => playBeep(784, 'sine', 0.2, 0.3), 300);
+      setTimeout(() => playBeep(1046, 'sine', 0.5, 0.4), 450);
+    }
+
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    const banner = document.getElementById('goalBanner');
+    const hint = document.getElementById('hint');
+
+    let mode = 'bot';
+    let difficulty = 'med';
+    let pScore = 0;
+    let bScore = 0;
+    const WIN_SCORE = 7;
+    let isGameOver = false;
+    let isGoalPaused = false;
+
+    // Table Dimensions
+    const W = c.width;
+    const H = c.height;
+    const GOAL_WIDTH = 170;
+    const GOAL_DEPTH = 18;
+    const GOAL_MIN_X = (W - GOAL_WIDTH) / 2;
+    const GOAL_MAX_X = (W + GOAL_WIDTH) / 2;
+
+    // Game Objects
+    const puck = {
+      x: W / 2,
+      y: H / 2,
+      r: 17,
+      vx: 0,
+      vy: 0,
+      maxSpeed: 24,
+      trail: []
+    };
+
+    const p1 = { // Blue (Bottom)
+      x: W / 2,
+      y: H - 110,
+      targetX: W / 2,
+      targetY: H - 110,
+      prevX: W / 2,
+      prevY: H - 110,
+      vx: 0,
+      vy: 0,
+      r: 32,
+      color: '#0284c7',
+      accent: '#38bdf8',
+      touchId: null
+    };
+
+    const p2 = { // Red (Top)
+      x: W / 2,
+      y: 110,
+      targetX: W / 2,
+      targetY: 110,
+      prevX: W / 2,
+      prevY: 110,
+      vx: 0,
+      vy: 0,
+      r: 32,
+      color: '#e11d48',
+      accent: '#fb7185',
+      touchId: null
+    };
+
+    const particles = [];
+    function spawnParticles(x, y, color, count = 12) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 6;
+        particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          r: 2 + Math.random() * 3,
+          color,
+          alpha: 1,
+          decay: 0.03 + Math.random() * 0.03
+        });
+      }
+    }
+
+    let socket = null, myPlayerNum = 1, activeRoom = null;
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    const nameParam = urlParams.get('name') || 'Player 1';
+
+    function initOnlineAirHockey(roomCode) {
+      if (typeof io === 'undefined') return;
+      if (!socket) socket = io();
+      activeRoom = roomCode;
+
+      socket.emit('universal_join', {
+        roomId: roomCode,
+        gameId: 'air-hockey',
+        playerName: nameParam
+      });
+
+      socket.on('universal_room_state', (data) => {
+        myPlayerNum = data.playerNum;
+        if (data.isReady) {
+          hint.innerHTML = `<span style="color:#22c55e">ONLINE MATCH READY!</span> You are Player ${myPlayerNum}.`;
+        } else {
+          hint.innerHTML = `<span style="color:#facc15">Waiting for Player 2 to join...</span> Share Room Code: <b>${roomCode}</b>`;
+        }
+      });
+
+      socket.on('universal_action_received', (data) => {
+        if (data.type === 'striker') {
+          if (myPlayerNum === 1) {
+            p2.targetX = data.x;
+            p2.targetY = data.y;
+          } else {
+            p1.targetX = data.x;
+            p1.targetY = data.y;
+          }
+        } else if (data.type === 'puck' && myPlayerNum === 2) {
+          puck.x = data.x;
+          puck.y = data.y;
+          puck.vx = data.vx;
+          puck.vy = data.vy;
+        }
+      });
+    }
+
+    function promptOnlineRoom() {
+      const code = prompt('Enter 1v1 Room Code to duel a friend online:', activeRoom || 'HOCKEY7');
+      if (code) {
+        mode = 'online';
+        document.getElementById('botBtn').className = 'mode-btn';
+        document.getElementById('pvpBtn').className = 'mode-btn';
+        document.getElementById('onlineBtn').className = 'mode-btn active';
+        document.getElementById('botDiff').style.display = 'none';
+        initOnlineAirHockey(code.trim().toUpperCase());
+        resetGame();
+      }
+    }
+
+    if (roomParam) {
+      mode = 'online';
+      document.getElementById('botBtn').className = 'mode-btn';
+      document.getElementById('pvpBtn').className = 'mode-btn';
+      document.getElementById('onlineBtn').className = 'mode-btn active';
+      document.getElementById('botDiff').style.display = 'none';
+      initOnlineAirHockey(roomParam.trim().toUpperCase());
+    }
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('botBtn').className = m === 'bot' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('pvpBtn').className = m === 'pvp' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('onlineBtn').className = m === 'online' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('botDiff').style.display = m === 'bot' ? 'inline-block' : 'none';
+      hint.innerHTML = m === 'bot' 
+        ? `<span>Player 1 (Blue)</span> controls bottom half • Playing vs ${difficulty.toUpperCase()} AI.`
+        : m === 'pvp' 
+          ? `<span>1v1 Local:</span> Top half drags <b style="color:#f43f5e">Red Striker</b> • Bottom half drags <b style="color:#38bdf8">Blue Striker</b>.`
+          : `<span>Online 1v1:</span> Connected to Room <b>${activeRoom || 'DUEL'}</b>.`;
+      resetGame();
+    }
+
+    function changeDiff(d) {
+      difficulty = d;
+      hint.innerHTML = `<span>Player 1 (Blue)</span> controls bottom half • Playing vs ${difficulty.toUpperCase()} AI.`;
+      resetPuck(Math.random() > 0.5 ? 'p1' : 'p2');
+    }
+
+    function resetGame() {
+      pScore = 0;
+      bScore = 0;
+      isGameOver = false;
+      document.getElementById('pScore').textContent = '0';
+      document.getElementById('bScore').textContent = '0';
+      p1.x = W / 2; p1.y = H - 110;
+      p2.x = W / 2; p2.y = 110;
+      resetPuck('p1');
+    }
+
+    function showBanner(text, color = '#38bdf8', dur = 1200) {
+      banner.textContent = text;
+      banner.style.borderColor = color;
+      banner.style.boxShadow = `0 0 35px ${color}88`;
+      banner.classList.add('show');
+      setTimeout(() => {
+        banner.classList.remove('show');
+      }, dur);
+    }
+
+    function resetPuck(toWhom) {
+      puck.x = W / 2;
+      puck.y = H / 2;
+      puck.trail = [];
+      const dir = toWhom === 'p1' ? 1 : -1;
+      puck.vx = (Math.random() - 0.5) * 4;
+      puck.vy = dir * 6;
+    }
+
+    // Touch and Mouse Handling
+    function getCanvasCoords(clientX, clientY) {
+      const rect = c.getBoundingClientRect();
+      const scaleX = W / rect.width;
+      const scaleY = H / rect.height;
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    }
+
+    c.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const pt = getCanvasCoords(touch.clientX, touch.clientY);
+        if (pt.y > H / 2 && p1.touchId === null) {
+          p1.touchId = touch.identifier;
+          p1.targetX = pt.x;
+          p1.targetY = Math.max(H / 2 + p1.r + 5, Math.min(H - p1.r - 8, pt.y));
+        } else if (mode === 'pvp' && pt.y < H / 2 && p2.touchId === null) {
+          p2.touchId = touch.identifier;
+          p2.targetX = pt.x;
+          p2.targetY = Math.max(p2.r + 8, Math.min(H / 2 - p2.r - 5, pt.y));
+        }
+      }
+    }, { passive: false });
+
+    c.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const pt = getCanvasCoords(touch.clientX, touch.clientY);
+        if (touch.identifier === p1.touchId) {
+          p1.targetX = Math.max(p1.r + 8, Math.min(W - p1.r - 8, pt.x));
+          p1.targetY = Math.max(H / 2 + p1.r + 5, Math.min(H - p1.r - 8, pt.y));
+        } else if (touch.identifier === p2.touchId) {
+          p2.targetX = Math.max(p2.r + 8, Math.min(W - p2.r - 8, pt.x));
+          p2.targetY = Math.max(p2.r + 8, Math.min(H / 2 - p2.r - 5, pt.y));
+        }
+      }
+    }, { passive: false });
+
+    function handleTouchEnd(e) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === p1.touchId) p1.touchId = null;
+        if (touch.identifier === p2.touchId) p2.touchId = null;
+      }
+    }
+    c.addEventListener('touchend', handleTouchEnd);
+    c.addEventListener('touchcancel', handleTouchEnd);
+
+    // Mouse Controls (for desktop testing / single player)
+    c.addEventListener('mousemove', (e) => {
+      const pt = getCanvasCoords(e.clientX, e.clientY);
+      if (pt.y > H / 2) {
+        p1.targetX = Math.max(p1.r + 8, Math.min(W - p1.r - 8, pt.x));
+        p1.targetY = Math.max(H / 2 + p1.r + 5, Math.min(H - p1.r - 8, pt.y));
+      } else if (mode === 'pvp') {
+        p2.targetX = Math.max(p2.r + 8, Math.min(W - p2.r - 8, pt.x));
+        p2.targetY = Math.max(p2.r + 8, Math.min(H / 2 - p2.r - 5, pt.y));
+      }
+    });
+
+    // Mallet to Mallet & Striker to Puck Physics
+    function updateStriker(p) {
+      p.prevX = p.x;
+      p.prevY = p.y;
+      // Smooth movement towards target
+      p.x += (p.targetX - p.x) * 0.75;
+      p.y += (p.targetY - p.y) * 0.75;
+      // Measure actual velocity for momentum transfer
+      p.vx = p.x - p.prevX;
+      p.vy = p.y - p.prevY;
+    }
+
+    function checkMalletCollision(m, isP1) {
+      const dx = puck.x - m.x;
+      const dy = puck.y - m.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = puck.r + m.r;
+
+      if (dist < minDist) {
+        // Normal collision vector
+        const nx = dx / (dist || 1);
+        const ny = dy / (dist || 1);
+
+        // Separate puck outside mallet
+        puck.x = m.x + nx * (minDist + 1);
+        puck.y = m.y + ny * (minDist + 1);
+
+        // Mallet momentum transfer
+        const malletSpeed = Math.hypot(m.vx, m.vy);
+        const impactForce = 1.35;
+
+        // Relative velocity
+        const rvx = puck.vx - m.vx;
+        const rvy = puck.vy - m.vy;
+        const velAlongNormal = rvx * nx + rvy * ny;
+
+        if (velAlongNormal < 0) {
+          const impulse = -(1 + 0.85) * velAlongNormal;
+          puck.vx += nx * impulse + m.vx * 0.65;
+          puck.vy += ny * impulse + m.vy * 0.65;
+        } else {
+          puck.vx = nx * (10 + malletSpeed * 0.8) + m.vx * 0.4;
+          puck.vy = ny * (10 + malletSpeed * 0.8) + m.vy * 0.4;
+        }
+
+        // Cap max velocity
+        const currSpeed = Math.hypot(puck.vx, puck.vy);
+        if (currSpeed > puck.maxSpeed) {
+          puck.vx = (puck.vx / currSpeed) * puck.maxSpeed;
+          puck.vy = (puck.vy / currSpeed) * puck.maxSpeed;
+        }
+
+        // Sound & Particles
+        soundHit(currSpeed);
+        spawnParticles(puck.x, puck.y, m.accent, 10);
+      }
+    }
+
+    // AI Bot Logic
+    function updateAI() {
+      if (mode !== 'bot') return;
+
+      let speed = 0.08;
+      let targetX = W / 2;
+      let targetY = 110;
+      let reactY = H / 2;
+
+      if (difficulty === 'easy') {
+        speed = 0.06;
+        reactY = H * 0.35;
+      } else if (difficulty === 'med') {
+        speed = 0.12;
+        reactY = H * 0.55;
+      } else if (difficulty === 'hard') {
+        speed = 0.18;
+        reactY = H * 0.75;
+      } else if (difficulty === 'insane') {
+        speed = 0.26;
+        reactY = H * 0.85;
+      }
+
+      // If puck is heading towards AI's side
+      if (puck.y < reactY) {
+        // Predictive defense: project puck's future X
+        let futureX = puck.x + puck.vx * 3.5;
+        // Bounce prediction on side walls
+        if (futureX < puck.r) futureX = puck.r + (puck.r - futureX);
+        if (futureX > W - puck.r) futureX = (W - puck.r) - (futureX - (W - puck.r));
+
+        targetX = futureX;
+
+        // Smash when puck is close
+        if (puck.y < H / 2 - 20) {
+          targetY = Math.max(p2.r + 20, puck.y - 10);
+          // Angle mallet towards opponent's goal
+          if (puck.x < W / 2) targetX += 15;
+          else targetX -= 15;
+        } else {
+          // Guard goal center
+          targetY = 100;
+        }
+      } else {
+        // Retreat to home guard position
+        targetX = W / 2;
+        targetY = 100;
+      }
+
+      // Constrain bot to top side
+      p2.targetX = Math.max(p2.r + 12, Math.min(W - p2.r - 12, targetX));
+      p2.targetY = Math.max(p2.r + 12, Math.min(H / 2 - p2.r - 10, targetY));
+    }
+
+    // Render Table Graphics
+    function drawTable() {
+      // Perforated Air Hockey Holes Pattern
+      ctx.fillStyle = '#0a101d';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+      const step = 20;
+      for (let x = 20; x < W; x += step) {
+        for (let y = 20; y < H; y += step) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Table Rail / Metallic Border
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(7, 7, W - 14, H - 14);
+
+      // Inner Neon Glow Outline
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(14, 14, W - 28, H - 28);
+
+      // Center Line & Face-off Circle
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(14, H / 2);
+      ctx.lineTo(W - 14, H / 2);
+      ctx.stroke();
+
+      // Center Face-off Circle
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, 75, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(244, 63, 94, 0.6)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#f43f5e';
+      ctx.fill();
+
+      // Goal Pockets
+      // Top Goal (Red side)
+      const gX = GOAL_MIN_X;
+      ctx.fillStyle = '#1e1b4b';
+      ctx.fillRect(gX, 0, GOAL_WIDTH, GOAL_DEPTH);
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(gX, 0, GOAL_WIDTH, GOAL_DEPTH);
+
+      // Bottom Goal (Blue side)
+      ctx.fillStyle = '#082f49';
+      ctx.fillRect(gX, H - GOAL_DEPTH, GOAL_WIDTH, GOAL_DEPTH);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(gX, H - GOAL_DEPTH, GOAL_WIDTH, GOAL_DEPTH);
+
+      // Corner Bumpers (Visual chamfers)
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 8;
+      // Top-left
+      ctx.beginPath(); ctx.moveTo(14, 45); ctx.lineTo(45, 14); ctx.stroke();
+      // Top-right
+      ctx.beginPath(); ctx.moveTo(W - 45, 14); ctx.lineTo(W - 14, 45); ctx.stroke();
+      // Bottom-left
+      ctx.beginPath(); ctx.moveTo(14, H - 45); ctx.lineTo(45, H - 14); ctx.stroke();
+      // Bottom-right
+      ctx.beginPath(); ctx.moveTo(W - 45, H - 14); ctx.lineTo(W - 14, H - 45); ctx.stroke();
+    }
+
+    // Render 3D Mallet Striker
+    function drawStriker(s) {
+      ctx.save();
+
+      // Outer glow
+      ctx.shadowColor = s.accent;
+      ctx.shadowBlur = 16;
+
+      // Base ring
+      const gradBase = ctx.createRadialGradient(s.x, s.y, s.r * 0.4, s.x, s.y, s.r);
+      gradBase.addColorStop(0, s.color);
+      gradBase.addColorStop(0.85, s.accent);
+      gradBase.addColorStop(1, '#0f172a');
+
+      ctx.fillStyle = gradBase;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Striker Bevel Rim
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#ffffff88';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Handle (Knob)
+      const gradHandle = ctx.createRadialGradient(s.x - 3, s.y - 3, 2, s.x, s.y, s.r * 0.45);
+      gradHandle.addColorStop(0, '#ffffff');
+      gradHandle.addColorStop(0.5, s.accent);
+      gradHandle.addColorStop(1, s.color);
+
+      ctx.fillStyle = gradHandle;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Render Puck with Motion Trail
+    function drawPuck() {
+      // Trail
+      for (let i = 0; i < puck.trail.length; i++) {
+        const pt = puck.trail[i];
+        const alpha = (i + 1) / puck.trail.length * 0.35;
+        ctx.fillStyle = `rgba(254, 240, 138, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, puck.r * (0.6 + 0.4 * (i / puck.trail.length)), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.save();
+      // Glow
+      ctx.shadowColor = '#facc15';
+      ctx.shadowBlur = 14;
+
+      // Puck body gradient
+      const grad = ctx.createRadialGradient(puck.x - 4, puck.y - 4, 3, puck.x, puck.y, puck.r);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.4, '#fef08a');
+      grad.addColorStop(0.8, '#eab308');
+      grad.addColorStop(1, '#a16207');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(puck.x, puck.y, puck.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rim
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#713f12';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Inner puck groove
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.beginPath();
+      ctx.arc(puck.x, puck.y, puck.r * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= p.decay;
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function checkGoal() {
+      if (isGoalPaused || isGameOver) return;
+
+      // Top Goal check (Red side goal scored by Blue player)
+      if (puck.y - puck.r <= GOAL_DEPTH) {
+        if (puck.x >= GOAL_MIN_X && puck.x <= GOAL_MAX_X) {
+          pScore++;
+          document.getElementById('pScore').textContent = pScore;
+          triggerGoal('Player 1 (Blue) Scores! 🎯', '#38bdf8', 'p1');
+          return;
+        }
+      }
+
+      // Bottom Goal check (Blue side goal scored by Red / Bot)
+      if (puck.y + puck.r >= H - GOAL_DEPTH) {
+        if (puck.x >= GOAL_MIN_X && puck.x <= GOAL_MAX_X) {
+          bScore++;
+          document.getElementById('bScore').textContent = bScore;
+          triggerGoal(mode === 'bot' ? 'Bot Scores! 🤖' : 'Player 2 (Red) Scores! 🎯', '#f43f5e', 'p2');
+          return;
+        }
+      }
+    }
+
+    function triggerGoal(msg, color, scorer) {
+      isGoalPaused = true;
+      soundGoal();
+      spawnParticles(puck.x, puck.y, color, 30);
+      showBanner(msg, color, 1400);
+
+      if (pScore >= WIN_SCORE || bScore >= WIN_SCORE) {
+        setTimeout(() => {
+          isGameOver = true;
+          soundWin();
+          const winnerText = pScore >= WIN_SCORE ? 'BLUE WINS MATCH! 🏆' : (mode === 'bot' ? 'BOT WINS MATCH! 👑' : 'RED WINS MATCH! 🏆');
+          showBanner(winnerText, color, 3000);
+          setTimeout(() => {
+            resetGame();
+          }, 3200);
+        }, 1200);
+        return;
+      }
+
+      setTimeout(() => {
+        resetPuck(scorer);
+        isGoalPaused = false;
+      }, 1500);
+    }
+
+    // Main Game Loop
+    function loop() {
+      // AI update
+      updateAI();
+
+      // Update Strikers
+      updateStriker(p1);
+      updateStriker(p2);
+
+      if (!isGoalPaused && !isGameOver) {
+        // Record trail
+        puck.trail.push({ x: puck.x, y: puck.y });
+        if (puck.trail.length > 7) puck.trail.shift();
+
+        // Move Puck
+        puck.x += puck.vx;
+        puck.y += puck.vy;
+
+        // Air Friction
+        puck.vx *= 0.992;
+        puck.vy *= 0.992;
+
+        // Side Wall Collisions
+        const minX = 14 + puck.r;
+        const maxX = W - 14 - puck.r;
+        if (puck.x < minX) {
+          puck.x = minX;
+          puck.vx *= -1;
+          soundWall();
+          spawnParticles(puck.x, puck.y, '#38bdf8', 4);
+        } else if (puck.x > maxX) {
+          puck.x = maxX;
+          puck.vx *= -1;
+          soundWall();
+          spawnParticles(puck.x, puck.y, '#38bdf8', 4);
+        }
+
+        // Top & Bottom Rails (Outside Goals)
+        const minY = 14 + puck.r;
+        const maxY = H - 14 - puck.r;
+
+        // Top Rail bounce
+        if (puck.y < minY) {
+          if (puck.x < GOAL_MIN_X || puck.x > GOAL_MAX_X) {
+            puck.y = minY;
+            puck.vy *= -1;
+            soundWall();
+            spawnParticles(puck.x, puck.y, '#f43f5e', 4);
+          }
+        }
+
+        // Bottom Rail bounce
+        if (puck.y > maxY) {
+          if (puck.x < GOAL_MIN_X || puck.x > GOAL_MAX_X) {
+            puck.y = maxY;
+            puck.vy *= -1;
+            soundWall();
+            spawnParticles(puck.x, puck.y, '#38bdf8', 4);
+          }
+        }
+
+        // Check Mallet Collisions
+        checkMalletCollision(p1, true);
+        checkMalletCollision(p2, false);
+
+        // Check Goals
+        checkGoal();
+      }
+
+      // Drawing
+      drawTable();
+      drawPuck();
+      drawStriker(p2);
+      drawStriker(p1);
+      drawParticles();
+
+      requestAnimationFrame(loop);
+    }
+
+    // Initialize
+    resetPuck('p1');
+    loop();
+  </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Retro Pong - Harshit's Game Hub</title>
+  <style>
+    body { background: #0b0e14; color: #fff; font-family: monospace; text-align: center; margin: 0; padding: 10px; }
+    header { display: flex; justify-content: space-between; align-items: center; max-width: 520px; margin: 0 auto 10px; flex-wrap: wrap; gap: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; }
+    .mode-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+    .mode-btn.active { background: #0284c7; border-color: #38bdf8; color: #fff; }
+    canvas { background: #000; border: 4px solid #fff; max-width: 100%; height: auto; touch-action: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div>
+      <button class="mode-btn active" id="botBtn" onclick="setMode('bot')">🤖 vs AI</button>
+      <button class="mode-btn" id="pvpBtn" onclick="setMode('pvp')">⚔️ 1v1 Local</button>
+    </div>
+    <div style="font-size:1.2rem;">P1: <span id="p1">0</span> | P2: <span id="p2">0</span></div>
+  </header>
+  <canvas id="c" width="500" height="350"></canvas>
+  <p style="color:#94a3b8; font-size:0.8rem;" id="hint">Drag left side to control Paddle 1</p>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    let p1Y = 135, p2Y = 135, p1Score = 0, p2Score = 0, mode = 'bot';
+    const pW = 10, pH = 70;
+    let bX = 250, bY = 175, bVX = 4, bVY = 3;
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('botBtn').className = m === 'bot' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('pvpBtn').className = m === 'pvp' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('hint').textContent = m === 'bot' ? 'Drag left side to control Paddle 1' : 'P1 drags Left side | P2 drags Right side';
+      p1Score = 0; p2Score = 0;
+      document.getElementById('p1').textContent = 0;
+      document.getElementById('p2').textContent = 0;
+    }
+
+    function handleTouch(e) {
+      e.preventDefault();
+      const rect = c.getBoundingClientRect();
+      const scaleX = c.width / rect.width;
+      const scaleY = c.height / rect.height;
+      for (let i = 0; i < e.touches.length; i++) {
+        const t = e.touches[i];
+        const tx = (t.clientX - rect.left) * scaleX;
+        const ty = (t.clientY - rect.top) * scaleY;
+        if (tx < c.width / 2) {
+          p1Y = Math.max(0, Math.min(c.height - pH, ty - pH / 2));
+        } else if (mode === 'pvp') {
+          p2Y = Math.max(0, Math.min(c.height - pH, ty - pH / 2));
+        }
+      }
+    }
+
+    c.addEventListener('touchstart', handleTouch, { passive: false });
+    c.addEventListener('touchmove', handleTouch, { passive: false });
+
+    c.addEventListener('mousemove', e => {
+      const rect = c.getBoundingClientRect();
+      const my = (e.clientY - rect.top) * (c.height / rect.height);
+      const mx = (e.clientX - rect.left) * (c.width / rect.width);
+      if (mx < c.width / 2 || mode === 'bot') {
+        p1Y = Math.max(0, Math.min(c.height - pH, my - pH / 2));
+      } else if (mode === 'pvp') {
+        p2Y = Math.max(0, Math.min(c.height - pH, my - pH / 2));
+      }
+    });
+
+    function loop() {
+      if (mode === 'bot') {
+        p2Y += (bY - (p2Y + pH / 2)) * 0.085;
+        p2Y = Math.max(0, Math.min(c.height - pH, p2Y));
+      }
+
+      bX += bVX; bY += bVY;
+      if (bY <= 0 || bY >= c.height) bVY *= -1;
+
+      if (bX <= 20 + pW && bY >= p1Y && bY <= p1Y + pH) {
+        bVX = Math.abs(bVX) * 1.05;
+        bVY += (bY - (p1Y + pH / 2)) * 0.1;
+      }
+      if (bX >= c.width - 20 - pW && bY >= p2Y && bY <= p2Y + pH) {
+        bVX = -Math.abs(bVX) * 1.05;
+        bVY += (bY - (p2Y + pH / 2)) * 0.1;
+      }
+
+      if (bX < 0) {
+        p2Score++; document.getElementById('p2').textContent = p2Score;
+        bX = 250; bY = 175; bVX = 4; bVY = 2;
+      }
+      if (bX > c.width) {
+        p1Score++; document.getElementById('p1').textContent = p1Score;
+        bX = 250; bY = 175; bVX = -4; bVY = 2;
+      }
+
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      ctx.setLineDash([6, 6]); ctx.strokeStyle = '#555';
+      ctx.beginPath(); ctx.moveTo(c.width / 2, 0); ctx.lineTo(c.width / 2, c.height); ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#38bdf8'; ctx.fillRect(20, p1Y, pW, pH);
+      ctx.fillStyle = '#f43f5e'; ctx.fillRect(c.width - 20 - pW, p2Y, pW, pH);
+      ctx.fillStyle = '#fff'; ctx.fillRect(bX - 5, bY - 5, 10, 10);
+
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Connect 4 Pro - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      background: #060913;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    .back-btn {
+      background: #1e293b;
+      color: #38bdf8;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    .modes-group {
+      display: flex;
+      gap: 4px;
+      background: #111827;
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+    }
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .mode-btn.active {
+      background: #0284c7;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(2, 132, 199, 0.5);
+    }
+    .score-board {
+      display: flex;
+      gap: 12px;
+      background: #0f172a;
+      padding: 6px 14px;
+      border-radius: 10px;
+      border: 1px solid #1e293b;
+      font-weight: 900;
+      font-size: 1rem;
+    }
+    .status-banner {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .board-container {
+      background: #1e3a8a;
+      padding: 12px;
+      border-radius: 20px;
+      box-shadow: 0 10px 35px rgba(30, 58, 138, 0.6), 0 0 20px rgba(56, 189, 248, 0.3);
+      border: 4px solid #3b82f6;
+      display: inline-block;
+      touch-action: manipulation;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(7, 50px);
+      grid-template-rows: repeat(6, 50px);
+      gap: 8px;
+    }
+    @media (max-width: 440px) {
+      .grid {
+        grid-template-columns: repeat(7, 40px);
+        grid-template-rows: repeat(6, 40px);
+        gap: 6px;
+      }
+    }
+    .slot {
+      width: 100%;
+      height: 100%;
+      background: #060913;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: inset 0 4px 8px rgba(0,0,0,0.8);
+      position: relative;
+      transition: background 0.2s;
+    }
+    .slot.p1 {
+      background: radial-gradient(circle at 35% 35%, #f87171, #ef4444 60%, #991b1b);
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.6), inset 0 2px 4px rgba(255,255,255,0.4);
+    }
+    .slot.p2 {
+      background: radial-gradient(circle at 35% 35%, #fde047, #eab308 60%, #854d0e);
+      box-shadow: 0 0 15px rgba(234, 179, 8, 0.6), inset 0 2px 4px rgba(255,255,255,0.4);
+    }
+    .slot.win {
+      animation: pulseWin 0.6s infinite alternate;
+    }
+    @keyframes pulseWin {
+      0% { transform: scale(0.95); box-shadow: 0 0 20px #fff; }
+      100% { transform: scale(1.1); box-shadow: 0 0 35px #fff; }
+    }
+    .reset-btn {
+      margin-top: 15px;
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      padding: 8px 24px;
+      border-radius: 8px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="modes-group">
+      <button class="mode-btn active" id="botBtn" onclick="setMode('bot')">🤖 vs Smart AI</button>
+      <button class="mode-btn" id="pvpBtn" onclick="setMode('pvp')">⚔️ 1v1 Local</button>
+    </div>
+    <div class="score-board">
+      <span style="color:#ef4444" id="rScore">🔴 0</span>
+      <span style="color:#64748b">:</span>
+      <span style="color:#eab308" id="yScore">🟡 0</span>
+    </div>
+  </header>
+
+  <div class="status-banner" id="status">
+    <span id="turnIndicator">🔴 Red's Turn</span>
+  </div>
+
+  <div class="board-container">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <button class="reset-btn" onclick="resetBoard()">Restart Board</button>
+
+  <script>
+    const ROWS = 6, COLS = 7;
+    let board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    let turn = 1; // 1 = Red, 2 = Yellow
+    let mode = 'bot';
+    let gameOver = false;
+    let rScore = 0, yScore = 0;
+
+    // Web Audio Synthesizer
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(freq, dur = 0.08) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    const gridEl = document.getElementById('grid');
+    const statusEl = document.getElementById('status');
+
+    function buildGrid() {
+      gridEl.innerHTML = '';
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const slot = document.createElement('div');
+          slot.className = 'slot';
+          slot.dataset.col = c;
+          slot.dataset.row = r;
+          slot.onclick = () => handleColClick(c);
+          gridEl.appendChild(slot);
+        }
+      }
+    }
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('botBtn').className = m === 'bot' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('pvpBtn').className = m === 'pvp' ? 'mode-btn active' : 'mode-btn';
+      rScore = 0; yScore = 0;
+      updateScoreUI();
+      resetBoard();
+    }
+
+    function updateScoreUI() {
+      document.getElementById('rScore').textContent = `🔴 ${rScore}`;
+      document.getElementById('yScore').textContent = `🟡 ${yScore}`;
+    }
+
+    function handleColClick(col) {
+      if (gameOver) return;
+      if (mode === 'bot' && turn === 2) return;
+
+      dropPiece(col, turn);
+    }
+
+    function dropPiece(col, player) {
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (board[r][col] === 0) {
+          board[r][col] = player;
+          playBeep(player === 1 ? 380 : 440, 0.1);
+          renderBoard();
+
+          const winCells = checkWin(player);
+          if (winCells) {
+            handleWin(player, winCells);
+            return;
+          }
+
+          if (checkDraw()) {
+            gameOver = true;
+            statusEl.innerHTML = `🤝 It's a Draw!`;
+            playBeep(250, 0.3);
+            return;
+          }
+
+          turn = turn === 1 ? 2 : 1;
+          updateTurnIndicator();
+
+          if (mode === 'bot' && turn === 2 && !gameOver) {
+            setTimeout(botMove, 450);
+          }
+          return;
+        }
+      }
+    }
+
+    function updateTurnIndicator() {
+      if (turn === 1) {
+        statusEl.innerHTML = `🔴 <span style="color:#ef4444">Player 1 (Red)'s Turn</span>`;
+      } else {
+        statusEl.innerHTML = mode === 'bot'
+          ? `🤖 <span style="color:#eab308">Smart AI Thinking...</span>`
+          : `🟡 <span style="color:#eab308">Player 2 (Yellow)'s Turn</span>`;
+      }
+    }
+
+    function renderBoard() {
+      const slots = gridEl.children;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const idx = r * COLS + c;
+          const val = board[r][c];
+          slots[idx].className = 'slot' + (val === 1 ? ' p1' : val === 2 ? ' p2' : '');
+        }
+      }
+    }
+
+    function checkWin(p) {
+      // Horizontal
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+          if (board[r][c] === p && board[r][c+1] === p && board[r][c+2] === p && board[r][c+3] === p) {
+            return [[r,c], [r,c+1], [r,c+2], [r,c+3]];
+          }
+        }
+      }
+      // Vertical
+      for (let r = 0; r < ROWS - 3; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (board[r][c] === p && board[r+1][c] === p && board[r+2][c] === p && board[r+3][c] === p) {
+            return [[r,c], [r+1,c], [r+2,c], [r+3,c]];
+          }
+        }
+      }
+      // Diagonal down-right
+      for (let r = 0; r < ROWS - 3; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+          if (board[r][c] === p && board[r+1][c+1] === p && board[r+2][c+2] === p && board[r+3][c+3] === p) {
+            return [[r,c], [r+1,c+1], [r+2,c+2], [r+3,c+3]];
+          }
+        }
+      }
+      // Diagonal up-right
+      for (let r = 3; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+          if (board[r][c] === p && board[r-1][c+1] === p && board[r-2][c+2] === p && board[r-3][c+3] === p) {
+            return [[r,c], [r-1,c+1], [r-2,c+2], [r-3,c+3]];
+          }
+        }
+      }
+      return null;
+    }
+
+    function checkDraw() {
+      return board[0].every(cell => cell !== 0);
+    }
+
+    function handleWin(player, winCells) {
+      gameOver = true;
+      const slots = gridEl.children;
+      winCells.forEach(([r, c]) => {
+        slots[r * COLS + c].classList.add('win');
+      });
+
+      if (player === 1) {
+        rScore++;
+        statusEl.innerHTML = `🎉 <span style="color:#ef4444">Player 1 (Red) Wins!</span>`;
+      } else {
+        yScore++;
+        statusEl.innerHTML = mode === 'bot'
+          ? `🤖 <span style="color:#eab308">Smart AI Wins!</span>`
+          : `🎉 <span style="color:#eab308">Player 2 (Yellow) Wins!</span>`;
+      }
+      updateScoreUI();
+      playBeep(587, 0.15);
+      setTimeout(() => playBeep(880, 0.3), 150);
+    }
+
+    // Smart AI Minimax / Heuristic
+    function botMove() {
+      if (gameOver) return;
+
+      const validCols = [];
+      for (let c = 0; c < COLS; c++) {
+        if (board[0][c] === 0) validCols.push(c);
+      }
+      if (validCols.length === 0) return;
+
+      // 1. Can AI win immediately?
+      for (let col of validCols) {
+        let r = getLowestEmptyRow(col);
+        board[r][col] = 2;
+        if (checkWin(2)) {
+          board[r][col] = 0;
+          dropPiece(col, 2);
+          return;
+        }
+        board[r][col] = 0;
+      }
+
+      // 2. Must AI block player 1 win?
+      for (let col of validCols) {
+        let r = getLowestEmptyRow(col);
+        board[r][col] = 1;
+        if (checkWin(1)) {
+          board[r][col] = 0;
+          dropPiece(col, 2);
+          return;
+        }
+        board[r][col] = 0;
+      }
+
+      // 3. Prefer center columns (3, 2, 4, 1, 5, 0, 6)
+      const preference = [3, 2, 4, 1, 5, 0, 6];
+      for (let col of preference) {
+        if (validCols.includes(col)) {
+          // Check it doesn't give player win on next move
+          let r = getLowestEmptyRow(col);
+          if (r > 0) {
+            board[r][col] = 2;
+            board[r-1][col] = 1;
+            let gaveWin = !!checkWin(1);
+            board[r-1][col] = 0;
+            board[r][col] = 0;
+            if (gaveWin && validCols.length > 1) continue;
+          }
+          dropPiece(col, 2);
+          return;
+        }
+      }
+
+      dropPiece(validCols[0], 2);
+    }
+
+    function getLowestEmptyRow(c) {
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (board[r][c] === 0) return r;
+      }
+      return -1;
+    }
+
+    function resetBoard() {
+      board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      gameOver = false;
+      turn = 1;
+      updateTurnIndicator();
+      renderBoard();
+    }
+
+    buildGrid();
+    resetBoard();
+  </script>
+</body>
+</html>
+

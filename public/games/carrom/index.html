@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pocket Carrom - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body { background: #060913; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+    header { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 480px; margin-bottom: 8px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; }
+    .score-box { background: #0f172a; border: 1px solid #1e293b; padding: 5px 14px; border-radius: 8px; font-weight: 900; color: #facc15; }
+    canvas { background: #d97706; border: 12px solid #78350f; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); touch-action: none; max-width: 100%; height: auto; }
+    .hint { font-size: 0.8rem; color: #94a3b8; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="score-box">⚪ White: <span id="wScore">0</span> | ⚫ Black: <span id="bScore">0</span></div>
+  </header>
+
+  <canvas id="c" width="460" height="460"></canvas>
+  <div class="hint">Flick the large ivory striker to pocket carrom men into 4 corner pockets!</div>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    let wScore = 0, bScore = 0;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function sfx(freq) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'triangle'; o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        g.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + 0.08);
+      } catch(e) {}
+    }
+
+    const striker = { x: 230, y: 380, vx: 0, vy: 0, r: 24, color: '#f8fafc' };
+    const pockets = [
+      { x: 30, y: 30, r: 26 }, { x: 430, y: 30, r: 26 },
+      { x: 30, y: 430, r: 26 }, { x: 430, y: 430, r: 26 }
+    ];
+
+    let men = [];
+    function initMen() {
+      men = [
+        { x: 230, y: 230, vx: 0, vy: 0, r: 15, color: '#ef4444', isQueen: true },
+        { x: 210, y: 230, vx: 0, vy: 0, r: 15, color: '#ffffff' },
+        { x: 250, y: 230, vx: 0, vy: 0, r: 15, color: '#ffffff' },
+        { x: 230, y: 210, vx: 0, vy: 0, r: 15, color: '#0f172a' },
+        { x: 230, y: 250, vx: 0, vy: 0, r: 15, color: '#0f172a' },
+        { x: 216, y: 216, vx: 0, vy: 0, r: 15, color: '#ffffff' },
+        { x: 244, y: 244, vx: 0, vy: 0, r: 15, color: '#ffffff' },
+        { x: 216, y: 244, vx: 0, vy: 0, r: 15, color: '#0f172a' },
+        { x: 244, y: 216, vx: 0, vy: 0, r: 15, color: '#0f172a' }
+      ];
+    }
+
+    let dragStart = null;
+    c.addEventListener('pointerdown', e => {
+      const rect = c.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (c.width / rect.width);
+      const y = (e.clientY - rect.top) * (c.height / rect.height);
+      if (Math.hypot(x - striker.x, y - striker.y) < striker.r + 20) {
+        dragStart = { x, y };
+      }
+    });
+
+    c.addEventListener('pointerup', e => {
+      if (!dragStart) return;
+      const rect = c.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (c.width / rect.width);
+      const y = (e.clientY - rect.top) * (c.height / rect.height);
+
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > 8) {
+        striker.vx = (dx / dist) * Math.min(18, dist * 0.18);
+        striker.vy = (dy / dist) * Math.min(18, dist * 0.18);
+        sfx(420);
+      }
+      dragStart = null;
+    });
+
+    function loop() {
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      // Carrom Center Circle
+      ctx.strokeStyle = '#78350f'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(230, 230, 60, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(230, 230, 15, 0, Math.PI * 2); ctx.stroke();
+
+      // Pockets
+      for (let p of pockets) {
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#451a03'; ctx.lineWidth = 4; ctx.stroke();
+      }
+
+      // Physics - Striker
+      striker.x += striker.vx; striker.y += striker.vy;
+      striker.vx *= 0.96; striker.vy *= 0.96;
+      if (striker.x < striker.r + 15 || striker.x > c.width - striker.r - 15) striker.vx *= -1;
+      if (striker.y < striker.r + 15 || striker.y > c.height - striker.r - 15) striker.vy *= -1;
+
+      // Physics - Carrom Men
+      for (let i = men.length - 1; i >= 0; i--) {
+        const m = men[i];
+        m.x += m.vx; m.y += m.vy;
+        m.vx *= 0.96; m.vy *= 0.96;
+        if (m.x < m.r + 15 || m.x > c.width - m.r - 15) m.vx *= -1;
+        if (m.y < m.r + 15 || m.y > c.height - m.r - 15) m.vy *= -1;
+
+        // Striker hits Men
+        const sDist = Math.hypot(striker.x - m.x, striker.y - m.y);
+        if (sDist < striker.r + m.r) {
+          const ang = Math.atan2(m.y - striker.y, m.x - striker.x);
+          m.vx = Math.cos(ang) * 9; m.vy = Math.sin(ang) * 9;
+          sfx(320);
+        }
+
+        // Pocket check
+        for (let p of pockets) {
+          if (Math.hypot(m.x - p.x, m.y - p.y) < p.r) {
+            if (m.color === '#ffffff') wScore += 10;
+            else if (m.color === '#0f172a') bScore += 10;
+            else wScore += 25;
+            document.getElementById('wScore').textContent = wScore;
+            document.getElementById('bScore').textContent = bScore;
+            sfx(650);
+            men.splice(i, 1);
+            break;
+          }
+        }
+      }
+
+      // Draw Men
+      for (let m of men) {
+        ctx.fillStyle = m.color;
+        ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#78350f'; ctx.lineWidth = 2; ctx.stroke();
+      }
+
+      // Draw Striker
+      ctx.fillStyle = striker.color;
+      ctx.shadowColor = '#fff'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(striker.x, striker.y, striker.r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#0284c7'; ctx.lineWidth = 3; ctx.stroke();
+
+      requestAnimationFrame(loop);
+    }
+
+    initMen();
+    loop();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HARSHIT'S GAME HUB</title>
+  <link rel="stylesheet" href="hub.css">
+</head>
+<body>
+  <div class="hub-container">
+    <!-- Top Hub Wireframe Bar matching diagram -->
+    <header class="hub-header">
+      <div class="hub-bar-top">
+        <span class="hub-brand-sub">HARSHIT'S GAME HUB .VERCEL (100+ GAMES)</span>
+      </div>
+      <div class="hub-navbar">
+        <button class="nav-segment-btn" id="openMenuBtn">
+          <span>☰ CATEGORIES</span>
+        </button>
+        <div class="nav-title-segment">
+          <h1>MINI GAMES (<span id="totalGameCount">106</span>)</h1>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="nav-segment-btn" id="openRoomModalBtn" style="background:#0284c7; border-color:#38bdf8; color:#fff;" title="Create or Join a 1v1 Room with Room Code">
+            <span>⚔️ 1v1 ROOM</span>
+          </button>
+          <button class="nav-segment-btn" id="openReviewBtn">
+            <span>★ REVIEW</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Category Filter Pills Bar -->
+      <div class="category-pill-bar">
+        <button class="cat-pill active" data-cat="all">🔥 All Games (102)</button>
+        <button class="cat-pill" data-cat="action">⚔️ Action</button>
+        <button class="cat-pill" data-cat="adventure">🗺️ Adventure</button>
+        <button class="cat-pill" data-cat="multiplayer">👥 2P / Party</button>
+        <button class="cat-pill" data-cat="arcade">👾 Arcade</button>
+        <button class="cat-pill" data-cat="puzzle">🧩 Puzzle</button>
+        <button class="cat-pill" data-cat="sports">🏎️ Racing & Sports</button>
+        <button class="cat-pill" data-cat="board">🎲 Board & Cards</button>
+        <button class="cat-pill" data-cat="casual">🎈 Casual</button>
+      </div>
+    </header>
+
+    <!-- Search Bar -->
+    <div class="search-bar-row">
+      <input type="text" id="gameSearchInput" placeholder="🔍 Search among 100+ mini games...">
+    </div>
+
+    <!-- 100+ Featured Mini Games Grid (3x4 Layout Matching Diagram) -->
+    <main class="hub-grid-area" id="gamesGrid">
+      <!-- Injected dynamically from GAMES_CATALOG -->
+    </main>
+
+    <!-- Category Menu Modal -->
+    <div class="hub-modal-overlay hidden" id="menuModal">
+      <div class="hub-modal-card">
+        <h2>🗂️ GAME CATEGORIES</h2>
+        <div class="menu-list">
+          <button class="cat-select-item" data-cat="all">🔥 All Games (102 Total)</button>
+          <button class="cat-select-item" data-cat="action">⚔️ Action & Fighting</button>
+          <button class="cat-select-item" data-cat="adventure">🗺️ Adventure & Exploration</button>
+          <button class="cat-select-item" data-cat="multiplayer">👥 1v1 Multiplayer & 4P Party</button>
+          <button class="cat-select-item" data-cat="arcade">👾 Retro Arcade Classics</button>
+          <button class="cat-select-item" data-cat="puzzle">🧩 Logic & Brain Puzzles</button>
+          <button class="cat-select-item" data-cat="sports">🏎️ Racing, Cars & Sports</button>
+          <button class="cat-select-item" data-cat="board">🎲 Classic Board & Card Games</button>
+          <button class="cat-select-item" data-cat="casual">🎈 Casual, Relaxing & Fun</button>
+        </div>
+        <button class="hub-close-btn" id="closeMenuBtn">Close</button>
+      </div>
+    </div>
+
+    <!-- Universal 1v1 Room Modal -->
+    <div class="hub-modal-overlay hidden" id="roomModal">
+      <div class="hub-modal-card">
+        <h2>⚔️ 1v1 UNIVERSAL ROOM</h2>
+        <p class="subtitle">Create or join a private room to battle a friend in any game!</p>
+
+        <div style="margin: 15px 0; text-align: left;">
+          <label style="font-size:0.85rem; font-weight:700; color:#94a3b8; display:block; margin-bottom:5px;">Your Nickname</label>
+          <input type="text" id="uniPlayerName" value="Player 1" style="width:100%; padding:10px; background:#0f172a; border:1px solid #334155; border-radius:8px; color:#fff; font-size:0.95rem; font-weight:700;">
+        </div>
+
+        <div style="margin: 15px 0; text-align: left;">
+          <label style="font-size:0.85rem; font-weight:700; color:#94a3b8; display:block; margin-bottom:5px;">Select Game to Battle In</label>
+          <select id="uniGameSelect" style="width:100%; padding:10px; background:#0f172a; border:1px solid #334155; border-radius:8px; color:#38bdf8; font-size:0.95rem; font-weight:700; outline:none;">
+            <!-- Populated dynamically from GAMES_CATALOG -->
+          </select>
+        </div>
+
+        <div style="margin: 15px 0; text-align: left;">
+          <label style="font-size:0.85rem; font-weight:700; color:#94a3b8; display:block; margin-bottom:5px;">Room Code</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="uniRoomInput" value="DUEL7" maxlength="12" style="flex:1; padding:10px; background:#0f172a; border:1px solid #334155; border-radius:8px; color:#facc15; font-size:1.1rem; font-weight:900; letter-spacing:1px; text-transform:uppercase;">
+            <button type="button" id="uniRandomRoomBtn" style="background:#1e293b; border:1px solid #475569; color:#fff; padding:0 12px; border-radius:8px; cursor:pointer; font-weight:bold;">🎲 Random</button>
+          </div>
+        </div>
+
+        <div class="modal-btn-row">
+          <button class="primary-btn" id="startUniversalRoomBtn" style="background:#0284c7; border:none;">🚀 Launch 1v1 Room</button>
+          <button class="secondary-btn" id="closeRoomModalBtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div class="hub-modal-overlay hidden" id="reviewModal">
+      <div class="hub-modal-card review-card">
+        <h2>⭐ PLAYER REVIEWS</h2>
+        <p class="subtitle">Leave feedback for Harshit's Game Hub</p>
+        
+        <div class="rating-stars" id="starContainer">
+          <span class="star active" data-v="1">★</span>
+          <span class="star active" data-v="2">★</span>
+          <span class="star active" data-v="3">★</span>
+          <span class="star active" data-v="4">★</span>
+          <span class="star active" data-v="5">★</span>
+        </div>
+
+        <textarea id="reviewTextInput" placeholder="Write your thoughts about the mini games..." rows="3"></textarea>
+        
+        <div class="reviews-feed" id="reviewsFeed">
+          <div class="review-bubble">
+            <strong>Karan:</strong> "100+ games in one place is insane! Pen Fight and Air Hockey work so well." ⭐⭐⭐⭐⭐
+          </div>
+          <div class="review-bubble">
+            <strong>Amit:</strong> "Every game having Bot and 1v1 mode makes it the best portal." ⭐⭐⭐⭐⭐
+          </div>
+        </div>
+
+        <div class="modal-btn-row">
+          <button class="primary-btn" id="submitReviewBtn">Submit Review</button>
+          <button class="secondary-btn" id="closeReviewBtn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/games-data.js"></script>
+  <script src="hub.js"></script>
+</body>
+</html>

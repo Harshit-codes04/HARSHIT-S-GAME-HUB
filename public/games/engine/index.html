@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Arcade Master - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      background: #060913;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 6px;
+      gap: 6px;
+    }
+    .back-btn {
+      background: #1e293b;
+      color: #38bdf8;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    .modes-group {
+      display: flex;
+      gap: 4px;
+      background: #111827;
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+    }
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 5px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .mode-btn.active {
+      background: #0284c7;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(2, 132, 199, 0.5);
+    }
+    .score-badge {
+      background: #0f172a;
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: #facc15;
+    }
+    canvas {
+      background: #070c16;
+      border: 4px solid #1e293b;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 25px rgba(56, 189, 248, 0.15);
+      touch-action: none;
+      max-width: 100%;
+      height: auto;
+    }
+    .hint { font-size: 0.8rem; color: #94a3b8; margin-top: 6px; max-width: 460px; line-height: 1.4; }
+    .hint b { color: #38bdf8; }
+    .action-controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+      width: 100%;
+      max-width: 460px;
+      justify-content: center;
+    }
+    .act-btn {
+      flex: 1;
+      padding: 10px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #fff;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .act-btn.primary { background: #e11d48; border-color: #f43f5e; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="modes-group">
+      <button class="mode-btn active" id="botBtn" onclick="setMode('bot')">🤖 vs AI / Solo</button>
+      <button class="mode-btn" id="pvpBtn" onclick="setMode('pvp')">⚔️ 1v1 Local</button>
+      <button class="mode-btn" id="onlineBtn" onclick="promptOnlineRoom()">🌐 Online Room</button>
+    </div>
+    <div class="score-badge"><span id="gameTitle">Game</span>: <b id="score">0</b></div>
+  </header>
+
+  <canvas id="c" width="460" height="520"></canvas>
+  <div class="action-controls" id="actionControls" style="display:none;"></div>
+  <div class="hint" id="hint">Loading game engine...</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games-data.js"></script>
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameId = urlParams.get('id') || 'boxing-knockout';
+    const initialRoom = urlParams.get('room');
+    const playerNameParam = urlParams.get('name') || 'Player 1';
+    const gameMeta = (window.GAMES_CATALOG && window.GAMES_CATALOG.find(g => g.id === gameId)) || { title: 'Mini Game', cat: 'action', type: 'box' };
+
+    document.getElementById('gameTitle').textContent = gameMeta.title;
+    document.title = `${gameMeta.title} - Harshit's Game Hub`;
+
+    let mode = 'bot', score = 0, p1Score = 0, p2Score = 0, gameOver = false, frame = 0;
+    let state = {};
+    let socket = null;
+    let myPlayerNum = 1;
+
+    // Web Audio Synthesizer
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function sfx(freq, type='sine', dur=0.08, vol=0.2) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        g.gain.setValueAtTime(vol, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('botBtn').className = m === 'bot' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('pvpBtn').className = m === 'pvp' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('onlineBtn').className = m === 'online' ? 'mode-btn active' : 'mode-btn';
+      initGame();
+    }
+
+    function promptOnlineRoom() {
+      const code = prompt('Enter 1v1 Room Code to duel online:', 'DUEL7');
+      if (code) {
+        setMode('online');
+        if (!socket) socket = io();
+        socket.emit('universal_join', { roomId: code.trim().toUpperCase(), gameId, playerName: playerNameParam });
+        socket.on('universal_room_state', d => {
+          document.getElementById('hint').innerHTML = `<span style="color:#22c55e">ONLINE MATCH!</span> Connected to Room <b>${code}</b>.`;
+        });
+      }
+    }
+
+    // Comprehensive Game Engine Setup for Every Single Catalog Game Type
+    function initGame() {
+      score = 0; p1Score = 0; p2Score = 0; gameOver = false; frame = 0;
+      document.getElementById('score').textContent = 0;
+      const type = gameMeta.type || '';
+      const ctrlDiv = document.getElementById('actionControls');
+      ctrlDiv.style.display = 'none';
+      ctrlDiv.innerHTML = '';
+
+      if (type === 'box' || gameId === 'boxing-knockout') {
+        // 🥊 1. PIXEL BOXING
+        document.getElementById('hint').innerHTML = 'Tap <b>JAB</b> or <b>HOOK</b> to punch opponent! Tap <b>DODGE</b> to evade!';
+        ctrlDiv.style.display = 'flex';
+        ctrlDiv.innerHTML = `
+          <button class="act-btn primary" onclick="boxAction('jab')">🥊 JAB</button>
+          <button class="act-btn primary" onclick="boxAction('hook')">💥 HOOK</button>
+          <button class="act-btn" onclick="boxAction('dodge')">🛡️ DODGE</button>
+        `;
+        state = {
+          p1: { x: 140, y: 320, hp: 100, state: 'idle', timer: 0 },
+          p2: { x: 320, y: 320, hp: 100, state: 'idle', timer: 0 },
+          sparks: []
+        };
+      } else if (type === 'ninja' || gameId === 'ninja-runner') {
+        // 🥷 2. SHADOW NINJA
+        document.getElementById('hint').innerHTML = 'Tap screen to <b>WALL JUMP</b> between rooftops and avoid spikes!';
+        state = {
+          ninja: { side: 'left', y: 400, vy: 0, x: 80 },
+          obstacles: [],
+          wallSpeed: 4
+        };
+      } else if (type === 'zombie' || gameId === 'zombie-survival') {
+        // 🧟 3. ZOMBIE BUNKER
+        document.getElementById('hint').innerHTML = 'Tap screen to <b>aim & shoot incoming zombies</b> before they reach your bunker!';
+        state = {
+          bunkerHp: 100,
+          zombies: [],
+          bullets: []
+        };
+      } else if (type === 'mecha' || gameId === 'robot-smash') {
+        // 🤖 4. TITAN MECHA SMASH
+        document.getElementById('hint').innerHTML = 'Drag mecha to position, tap <b>LASER</b> to blast titan!';
+        ctrlDiv.style.display = 'flex';
+        ctrlDiv.innerHTML = `<button class="act-btn primary" onclick="mechaShoot()">⚡ FIRE TITAN LASER</button>`;
+        state = {
+          p1: { x: 230, y: 440, r: 24, hp: 100 },
+          boss: { x: 230, y: 120, vx: 3, r: 40, hp: 150 },
+          lasers: []
+        };
+      } else if (type === 'meteor' || gameId === 'meteor-strike') {
+        // ☄️ 5. METEOR SHIELD
+        document.getElementById('hint').innerHTML = 'Move shield orb to <b>deflect burning meteors</b> away from Earth!';
+        state = {
+          shield: { x: 230, y: 420, r: 28 },
+          meteors: []
+        };
+      } else if (type === 'sword' || gameId === 'sword-slash') {
+        // ⚔️ 6. BLADE SLASH
+        document.getElementById('hint').innerHTML = 'Tap <b>STRIKE</b> when enemy prepares attack! Tap <b>PARRY</b> to counter!';
+        ctrlDiv.style.display = 'flex';
+        ctrlDiv.innerHTML = `
+          <button class="act-btn primary" onclick="swordAction('strike')">⚔️ STRIKE</button>
+          <button class="act-btn" onclick="swordAction('parry')">🛡️ PARRY</button>
+        `;
+        state = {
+          p1: { hp: 3, action: 'idle', timer: 0 },
+          ai: { hp: 3, action: 'idle', timer: 0, wait: 60 }
+        };
+      } else if (type === 'stack' || gameId === 'stack-tower') {
+        // 🏢 7. TOWER STACK
+        document.getElementById('hint').innerHTML = 'Tap screen to <b>drop moving block</b> perfectly on top of tower!';
+        state = {
+          blocks: [{ x: 160, y: 480, w: 140, h: 24, color: '#38bdf8' }],
+          curr: { x: 0, y: 456, w: 140, h: 24, vx: 4, color: '#f43f5e' }
+        };
+      } else if (type === 'hoops' || gameId === 'dunk-hoops') {
+        // 🏀 8. STREET BASKETBALL
+        document.getElementById('hint').innerHTML = 'Swipe / Flick basketball upwards to swish into hoop!';
+        state = {
+          ball: { x: 230, y: 450, vx: 0, vy: 0, r: 16, inAir: false },
+          hoop: { x: 340, y: 160, w: 60 }
+        };
+      } else if (type === 'golf' || gameId === 'mini-golf-putt') {
+        // ⛳ 9. MINI GOLF
+        document.getElementById('hint').innerHTML = 'Drag back from white golf ball to aim putt into flag cup!';
+        state = {
+          ball: { x: 230, y: 460, vx: 0, vy: 0, r: 9 },
+          hole: { x: 230, y: 100, r: 14 }
+        };
+      } else if (type === 'bowling' || gameId === 'bowling-strike') {
+        // 🎳 10. STRIKE BOWLING
+        document.getElementById('hint').innerHTML = 'Swipe bowling ball down lane to knock all 10 pins!';
+        state = {
+          ball: { x: 230, y: 460, vx: 0, vy: 0, r: 18, inRoll: false },
+          pins: [
+            { x: 230, y: 80, hit: false },
+            { x: 215, y: 105, hit: false }, { x: 245, y: 105, hit: false },
+            { x: 200, y: 130, hit: false }, { x: 230, y: 130, hit: false }, { x: 260, y: 130, hit: false }
+          ]
+        };
+      } else if (type === 'clicker' || gameId === 'cookie-clicker') {
+        // 🍪 11. COOKIE CLICKER
+        document.getElementById('hint').innerHTML = 'Click giant cookie to bake cookies! Build your bakery empire!';
+        state = {
+          cookies: 0,
+          cps: 1
+        };
+      } else if (type === 'colorswitch' || gameId === 'color-switch-tap') {
+        // 🔴 12. COLOR ORB SWITCH
+        document.getElementById('hint').innerHTML = 'Tap screen to bounce orb through matching color obstacles!';
+        state = {
+          orb: { y: 400, vy: 0, color: '#38bdf8' },
+          ring: { y: 220, angle: 0 }
+        };
+      } else if (type === 'froghop' || gameId === 'frog-hop') {
+        // 🐸 13. FROG CROSSING
+        document.getElementById('hint').innerHTML = 'Tap screen to hop frog across river logs and roads!';
+        state = {
+          frog: { x: 230, y: 480, r: 14 },
+          cars: [
+            { x: 50, y: 380, vx: 3, w: 45, color: '#ef4444' },
+            { x: 300, y: 300, vx: -4, w: 45, color: '#fbbf24' }
+          ]
+        };
+      } else {
+        // ⚡ DEFAULT DYNAMIC REFLEX DODGE
+        document.getElementById('hint').innerHTML = 'Drag your hero orb to evade pulsing red energy cores!';
+        state = {
+          hero: { x: 230, y: 440, r: 18, color: '#38bdf8' },
+          hazards: [
+            { x: 100, y: 120, vx: 3, vy: 2, r: 20, color: '#f43f5e' },
+            { x: 360, y: 240, vx: -3, vy: 3, r: 20, color: '#f43f5e' }
+          ]
+        };
+      }
+    }
+
+    // Action Handlers
+    window.boxAction = function(act) {
+      if (gameOver) return;
+      const p1 = state.p1, p2 = state.p2;
+      p1.state = act; p1.timer = 15;
+      sfx(act === 'hook' ? 480 : 380, 'triangle');
+
+      if (p2.state !== 'dodge') {
+        const dmg = act === 'hook' ? 18 : 10;
+        p2.hp -= dmg;
+        state.sparks.push({ x: p2.x, y: p2.y, life: 12 });
+        score += dmg * 5;
+        document.getElementById('score').textContent = score;
+      }
+      if (p2.hp <= 0) {
+        gameOver = true;
+        sfx(650, 'sine', 0.4);
+      }
+    };
+
+    window.swordAction = function(act) {
+      if (gameOver) return;
+      state.p1.action = act; state.p1.timer = 20;
+      sfx(act === 'parry' ? 520 : 340, 'triangle');
+      if (act === 'strike' && state.ai.action !== 'parry') {
+        state.ai.hp--;
+        score += 50; document.getElementById('score').textContent = score;
+        if (state.ai.hp <= 0) gameOver = true;
+      }
+    };
+
+    window.mechaShoot = function() {
+      if (gameOver) return;
+      state.lasers.push({ x: state.p1.x, y: state.p1.y - 20, vy: -12 });
+      sfx(800, 'square', 0.05);
+    };
+
+    // Pointer Interaction
+    c.addEventListener('pointerdown', e => {
+      if (gameOver) { initGame(); return; }
+      const rect = c.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (c.width / rect.width);
+      const y = (e.clientY - rect.top) * (c.height / rect.height);
+      const type = gameMeta.type || '';
+
+      if (type === 'ninja') {
+        state.ninja.side = state.ninja.side === 'left' ? 'right' : 'left';
+        state.ninja.x = state.ninja.side === 'left' ? 80 : c.width - 80;
+        sfx(440, 'sine', 0.05);
+      } else if (type === 'zombie') {
+        state.bullets.push({ x: 230, y: 480, tx: x, ty: y });
+        sfx(600, 'square', 0.06);
+      } else if (type === 'stack') {
+        // Drop block
+        const curr = state.curr;
+        const top = state.blocks[state.blocks.length - 1];
+        const diff = curr.x - top.x;
+        if (Math.abs(diff) < top.w) {
+          curr.w = top.w - Math.abs(diff);
+          curr.x = diff > 0 ? curr.x : top.x;
+          state.blocks.push({ x: curr.x, y: curr.y, w: curr.w, h: curr.h, color: '#38bdf8' });
+          score += 10; document.getElementById('score').textContent = score;
+          state.curr = { x: 0, y: curr.y - 24, w: curr.w, h: 24, vx: 4 + state.blocks.length * 0.3, color: '#f43f5e' };
+          sfx(500 + state.blocks.length * 30, 'triangle');
+        } else {
+          gameOver = true;
+          sfx(160, 'sawtooth');
+        }
+      } else if (type === 'clicker') {
+        state.cookies += 1;
+        score = state.cookies;
+        document.getElementById('score').textContent = score;
+        sfx(650, 'sine', 0.04);
+      } else if (type === 'colorswitch') {
+        state.orb.vy = -7.5;
+        sfx(400, 'sine');
+      } else if (type === 'froghop') {
+        state.frog.y -= 35;
+        score += 10; document.getElementById('score').textContent = score;
+        sfx(350, 'sine');
+        if (state.frog.y < 60) {
+          state.frog.y = 480;
+          score += 50; document.getElementById('score').textContent = score;
+        }
+      }
+    });
+
+    c.addEventListener('pointermove', e => {
+      const rect = c.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (c.width / rect.width);
+      const y = (e.clientY - rect.top) * (c.height / rect.height);
+
+      if (state.shield) state.shield.x = Math.max(30, Math.min(c.width - 30, x));
+      if (state.p1 && gameMeta.type === 'mecha') state.p1.x = Math.max(30, Math.min(c.width - 30, x));
+      if (state.hero) {
+        state.hero.x = Math.max(20, Math.min(c.width - 20, x));
+        state.hero.y = Math.max(20, Math.min(c.height - 20, y));
+      }
+    });
+
+    // Main Engine Render Loop
+    function loop() {
+      frame++;
+      ctx.clearRect(0, 0, c.width, c.height);
+      const type = gameMeta.type || '';
+
+      if (type === 'box') {
+        // --- 1. PIXEL BOXING RING ---
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(40, 80, c.width - 80, c.height - 120);
+        ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4;
+        ctx.strokeRect(40, 80, c.width - 80, c.height - 120);
+
+        // Health Bars
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(40, 40, 160, 16); ctx.fillRect(260, 40, 160, 16);
+        ctx.fillStyle = '#38bdf8'; ctx.fillRect(40, 40, state.p1.hp * 1.6, 16);
+        ctx.fillStyle = '#f43f5e'; ctx.fillRect(260, 40, state.p2.hp * 1.6, 16);
+
+        // Draw Boxers
+        const p1 = state.p1, p2 = state.p2;
+        // P1
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath(); ctx.arc(p1.x, p1.y, 28, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ef4444'; // Gloves
+        const g1X = p1.state === 'jab' ? p1.x + 35 : p1.x + 20;
+        ctx.beginPath(); ctx.arc(g1X, p1.y, 12, 0, Math.PI * 2); ctx.fill();
+
+        // P2 (AI)
+        if (mode === 'bot' && !gameOver && frame % 45 === 0) {
+          p2.state = Math.random() < 0.6 ? 'jab' : 'dodge';
+          if (p2.state === 'jab' && p1.state !== 'dodge') p1.hp -= 8;
+        }
+
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, 28, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#38bdf8';
+        const g2X = p2.state === 'jab' ? p2.x - 35 : p2.x - 20;
+        ctx.beginPath(); ctx.arc(g2X, p2.y, 12, 0, Math.PI * 2); ctx.fill();
+
+      } else if (type === 'ninja') {
+        // --- 2. SHADOW NINJA ROOFTOP RUSH ---
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 60, c.height); ctx.fillRect(c.width - 60, 0, 60, c.height);
+
+        if (!gameOver) {
+          score++;
+          if (frame % 20 === 0) document.getElementById('score').textContent = Math.floor(score / 5);
+          if (frame % 50 === 0) {
+            state.obstacles.push({
+              y: -30,
+              side: Math.random() > 0.5 ? 'left' : 'right',
+              w: 30, h: 20
+            });
+          }
+
+          for (let i = state.obstacles.length - 1; i >= 0; i--) {
+            const ob = state.obstacles[i];
+            ob.y += state.wallSpeed;
+            ctx.fillStyle = '#ef4444';
+            const ox = ob.side === 'left' ? 60 : c.width - 90;
+            ctx.fillRect(ox, ob.y, ob.w, ob.h);
+
+            if (ob.side === state.ninja.side && Math.abs(ob.y - state.ninja.y) < 25) {
+              gameOver = true; sfx(140, 'sawtooth');
+            }
+            if (ob.y > c.height + 30) state.obstacles.splice(i, 1);
+          }
+        }
+
+        // Draw Ninja
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath(); ctx.arc(state.ninja.x, state.ninja.y, 16, 0, Math.PI * 2); ctx.fill();
+
+      } else if (type === 'zombie') {
+        // --- 3. ZOMBIE DEFENSE ---
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(0, 460, c.width, 60);
+
+        if (!gameOver) {
+          if (frame % 40 === 0) {
+            state.zombies.push({
+              x: Math.random() * (c.width - 60) + 30,
+              y: -20,
+              vy: 2 + Math.random() * 2,
+              hp: 2
+            });
+          }
+
+          // Move Bullets
+          for (let i = state.bullets.length - 1; i >= 0; i--) {
+            const b = state.bullets[i];
+            const ang = Math.atan2(b.ty - b.y, b.tx - b.x);
+            b.x += Math.cos(ang) * 12; b.y += Math.sin(ang) * 12;
+            ctx.fillStyle = '#fde047'; ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+
+            for (let j = state.zombies.length - 1; j >= 0; j--) {
+              const z = state.zombies[j];
+              if (Math.hypot(b.x - z.x, b.y - z.y) < 20) {
+                z.hp--;
+                state.bullets.splice(i, 1);
+                if (z.hp <= 0) {
+                  state.zombies.splice(j, 1);
+                  score += 20; document.getElementById('score').textContent = score;
+                }
+                break;
+              }
+            }
+          }
+
+          // Draw Zombies
+          for (let i = state.zombies.length - 1; i >= 0; i--) {
+            const z = state.zombies[i];
+            z.y += z.vy;
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath(); ctx.arc(z.x, z.y, 16, 0, Math.PI * 2); ctx.fill();
+            if (z.y >= 460) {
+              gameOver = true; sfx(120, 'sawtooth');
+            }
+          }
+        }
+
+      } else if (type === 'stack') {
+        // --- 4. TOWER STACK BLOCKS ---
+        for (let b of state.blocks) {
+          ctx.fillStyle = b.color;
+          ctx.fillRect(b.x, b.y, b.w, b.h);
+        }
+        if (!gameOver) {
+          const curr = state.curr;
+          curr.x += curr.vx;
+          if (curr.x <= 0 || curr.x + curr.w >= c.width) curr.vx *= -1;
+          ctx.fillStyle = curr.color;
+          ctx.fillRect(curr.x, curr.y, curr.w, curr.h);
+        }
+
+      } else if (type === 'clicker') {
+        // --- 5. GIANT COOKIE ---
+        ctx.fillStyle = '#d97706';
+        ctx.beginPath(); ctx.arc(230, 260, 110, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#92400e'; ctx.lineWidth = 8; ctx.stroke();
+        // Chocolate chips
+        ctx.fillStyle = '#451a03';
+        [[180, 220], [240, 200], [280, 250], [210, 290], [250, 310]].forEach(([cx, cy]) => {
+          ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill();
+        });
+
+      } else {
+        // --- DEFAULT DYNAMIC COMBAT / RUNNER ---
+        if (!gameOver) {
+          for (let h of state.hazards) {
+            h.x += h.vx; h.y += h.vy;
+            if (h.x <= h.r || h.x >= c.width - h.r) h.vx *= -1;
+            if (h.y <= h.r || h.y >= c.height - h.r) h.vy *= -1;
+            ctx.fillStyle = h.color; ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.fill();
+
+            if (Math.hypot(state.hero.x - h.x, state.hero.y - h.y) < state.hero.r + h.r) {
+              gameOver = true; sfx(140, 'sawtooth');
+            }
+          }
+          score++;
+          if (frame % 20 === 0) document.getElementById('score').textContent = Math.floor(score / 5);
+        }
+        ctx.fillStyle = state.hero.color;
+        ctx.beginPath(); ctx.arc(state.hero.x, state.hero.y, state.hero.r, 0, Math.PI * 2); ctx.fill();
+      }
+
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = 'bold 30px system-ui';
+        ctx.fillText('ROUND OVER', c.width / 2 - 90, c.height / 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '16px system-ui';
+        ctx.fillText('Tap anywhere to play again', c.width / 2 - 95, c.height / 2 + 35);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    initGame();
+    loop();
+  </script>
+</body>
+</html>

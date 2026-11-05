@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Laser Reflex Pro - Harshit's Game Hub</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      background: #060913;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+    .back-btn {
+      background: #1e293b;
+      color: #38bdf8;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    .score-badge {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      padding: 5px 14px;
+      border-radius: 8px;
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: #facc15;
+    }
+    canvas {
+      background: #050811;
+      border: 4px solid #1e293b;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 25px rgba(239, 68, 68, 0.25);
+      touch-action: none;
+      max-width: 100%;
+      height: auto;
+    }
+    .hint { font-size: 0.8rem; color: #94a3b8; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div class="score-badge">⚡ Reflex Score: <b id="score">0</b></div>
+  </header>
+
+  <canvas id="c" width="460" height="560"></canvas>
+  <div class="hint">Drag the cyan orb to collect energy cores & evade charging red laser grids!</div>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    let score = 0, gameOver = false, frame = 0;
+
+    // Web Audio Synthesizer
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function sfx(freq, type='sine', dur=0.08, vol=0.2) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        g.gain.setValueAtTime(vol, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    const orb = { x: 230, y: 440, r: 16, color: '#38bdf8' };
+    let lasers = [];
+    let cores = [];
+    let sparks = [];
+
+    function initGame() {
+      score = 0; gameOver = false; frame = 0;
+      document.getElementById('score').textContent = 0;
+      orb.x = 230; orb.y = 440;
+      lasers = []; cores = []; sparks = [];
+      spawnCore();
+    }
+
+    function spawnCore() {
+      cores.push({
+        x: Math.random() * (c.width - 80) + 40,
+        y: Math.random() * (c.height - 120) + 60,
+        r: 12,
+        pulse: 0
+      });
+    }
+
+    function setOrbPos(clientX, clientY) {
+      const rect = c.getBoundingClientRect();
+      const scaleX = c.width / rect.width;
+      const scaleY = c.height / rect.height;
+      orb.x = Math.max(orb.r + 10, Math.min(c.width - orb.r - 10, (clientX - rect.left) * scaleX));
+      orb.y = Math.max(orb.r + 10, Math.min(c.height - orb.r - 10, (clientY - rect.top) * scaleY));
+    }
+
+    c.addEventListener('mousemove', e => setOrbPos(e.clientX, e.clientY));
+    c.addEventListener('touchmove', e => {
+      e.preventDefault();
+      setOrbPos(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
+    function loop() {
+      frame++;
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      // Grid background
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < c.width; x += 30) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, c.height); ctx.stroke();
+      }
+      for (let y = 0; y < c.height; y += 30) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(c.width, y); ctx.stroke();
+      }
+
+      if (!gameOver) {
+        score++;
+        if (frame % 20 === 0) document.getElementById('score').textContent = Math.floor(score / 5);
+
+        // Spawn horizontal and vertical laser beams
+        if (frame % 45 === 0) {
+          const isHorizontal = Math.random() > 0.5;
+          lasers.push({
+            isHorizontal,
+            pos: isHorizontal ? Math.random() * (c.height - 60) + 30 : Math.random() * (c.width - 60) + 30,
+            warn: 30, // 30 frames warning
+            life: 80
+          });
+        }
+
+        // Process Lasers
+        for (let i = lasers.length - 1; i >= 0; i--) {
+          const l = lasers[i];
+          l.life--;
+          if (l.life <= 0) { lasers.splice(i, 1); continue; }
+
+          if (l.warn > 0) {
+            l.warn--;
+            // Telegraph dotted line
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
+            ctx.setLineDash([8, 8]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            if (l.isHorizontal) { ctx.moveTo(0, l.pos); ctx.lineTo(c.width, l.pos); }
+            else { ctx.moveTo(l.pos, 0); ctx.lineTo(l.pos, c.height); }
+            ctx.stroke();
+            ctx.setLineDash([]);
+          } else {
+            // Lethal Laser Beam
+            ctx.strokeStyle = '#ef4444';
+            ctx.shadowColor = '#ef4444';
+            ctx.shadowBlur = 18;
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            if (l.isHorizontal) { ctx.moveTo(0, l.pos); ctx.lineTo(c.width, l.pos); }
+            else { ctx.moveTo(l.pos, 0); ctx.lineTo(l.pos, c.height); }
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Collision Check with Orb
+            if (l.isHorizontal && Math.abs(orb.y - l.pos) < orb.r + 4) {
+              gameOver = true; sfx(140, 'sawtooth', 0.4);
+            } else if (!l.isHorizontal && Math.abs(orb.x - l.pos) < orb.r + 4) {
+              gameOver = true; sfx(140, 'sawtooth', 0.4);
+            }
+          }
+        }
+
+        // Energy Core Pickup
+        for (let i = cores.length - 1; i >= 0; i--) {
+          const cr = cores[i];
+          cr.pulse += 0.08;
+          const currR = cr.r + Math.sin(cr.pulse) * 3;
+
+          ctx.fillStyle = '#facc15';
+          ctx.shadowColor = '#facc15';
+          ctx.shadowBlur = 15;
+          ctx.beginPath();
+          ctx.arc(cr.x, cr.y, currR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          if (Math.hypot(orb.x - cr.x, orb.y - cr.y) < orb.r + cr.r) {
+            score += 150;
+            document.getElementById('score').textContent = Math.floor(score / 5);
+            sfx(650, 'sine', 0.12);
+            cores.splice(i, 1);
+            spawnCore();
+          }
+        }
+      }
+
+      // Draw Player Orb
+      ctx.fillStyle = orb.color;
+      ctx.shadowColor = orb.color;
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 32px system-ui';
+        ctx.fillText('LASER ZAPPED! ⚡', c.width / 2 - 130, c.height / 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '16px system-ui';
+        ctx.fillText('Tap anywhere to try again', c.width / 2 - 85, c.height / 2 + 35);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    c.addEventListener('click', () => { if (gameOver) initGame(); });
+
+    initGame();
+    loop();
+  </script>
+</body>
+</html>
+

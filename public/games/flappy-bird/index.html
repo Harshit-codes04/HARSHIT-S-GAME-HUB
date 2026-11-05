@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flappy Wings - Harshit's Game Hub</title>
+  <style>
+    body { background: #0b0e14; color: #fff; font-family: system-ui; text-align: center; margin: 0; padding: 10px; }
+    header { display: flex; justify-content: space-between; align-items: center; max-width: 360px; margin: 0 auto 10px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; }
+    canvas { background: #0284c7; border: 4px solid #38bdf8; border-radius: 12px; touch-action: none; max-width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div>Score: <strong id="score" style="color:#fbbf24">0</strong></div>
+    <span>🐥 Flappy Wings</span>
+  </header>
+  <canvas id="c" width="360" height="520"></canvas>
+  <p style="font-size:0.8rem; color:#94a3b8;">Tap or press Space to flap!</p>
+
+  <script>
+    const c = document.getElementById('c'), ctx = c.getContext('2d');
+    let birdY = 200, birdV = 0, pipes = [], score = 0, started = false;
+
+    function flap() {
+      if (!started) { started = true; pipes = []; score = 0; }
+      birdV = -6.5;
+    }
+
+    window.addEventListener('keydown', e => { if (e.code === 'Space') flap(); });
+    c.addEventListener('pointerdown', flap);
+
+    function loop() {
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      if (started) {
+        birdV += 0.35;
+        birdY += birdV;
+
+        if (pipes.length === 0 || pipes[pipes.length - 1].x < c.width - 150) {
+          const gapY = Math.random() * (c.height - 240) + 70;
+          pipes.push({ x: c.width, top: gapY, gap: 110, passed: false });
+        }
+
+        pipes.forEach(p => {
+          p.x -= 2.2;
+          ctx.fillStyle = '#22c55e';
+          // Top pipe
+          ctx.fillRect(p.x, 0, 50, p.top);
+          // Bottom pipe
+          ctx.fillRect(p.x, p.top + p.gap, 50, c.height - (p.top + p.gap));
+
+          // Hit detection
+          if (p.x < 70 && p.x + 50 > 30) {
+            if (birdY - 12 < p.top || birdY + 12 > p.top + p.gap) {
+              started = false; birdY = 200; birdV = 0;
+            }
+          }
+
+          if (!p.passed && p.x + 50 < 30) {
+            p.passed = true; score++; document.getElementById('score').textContent = score;
+          }
+        });
+
+        pipes = pipes.filter(p => p.x > -60);
+
+        if (birdY > c.height || birdY < 0) {
+          started = false; birdY = 200; birdV = 0;
+        }
+      }
+
+      // Draw Bird
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath(); ctx.arc(50, birdY, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(56, birdY - 3, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ea580c'; ctx.beginPath(); ctx.moveTo(62, birdY); ctx.lineTo(72, birdY + 4); ctx.lineTo(62, birdY + 8); ctx.fill();
+
+      if (!started) {
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 20px system-ui'; ctx.fillText('TAP TO START', 115, 270);
+      }
+
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Cards - Harshit's Game Hub</title>
+  <style>
+    body { background: #0b0e14; color: #fff; font-family: system-ui; text-align: center; margin: 0; padding: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; max-width: 440px; margin: 0 auto 16px; }
+    .back-btn { background: #1e293b; color: #38bdf8; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; }
+    .grid { display: grid; grid-template-columns: repeat(4, 80px); gap: 10px; justify-content: center; margin: 0 auto; }
+    .card { width: 80px; height: 95px; background: #1e293b; border: 2px solid #334155; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 2rem; cursor: pointer; user-select: none; transition: transform 0.2s; }
+    .card.flipped { background: #3b82f6; transform: rotateY(180deg); }
+    .card.matched { background: #10b981; border-color: #34d399; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="back-btn">← Hub</a>
+    <div>Moves: <strong id="moves" style="color:#38bdf8">0</strong></div>
+    <span>🃏 Memory Cards</span>
+  </header>
+  <div class="grid" id="grid"></div>
+
+  <script>
+    const icons = ['🍕','🚀','💎','🎸','🦁','⚡','🎮','🔥'];
+    let deck = [...icons, ...icons].sort(() => Math.random() - 0.5);
+    const grid = document.getElementById('grid');
+    let flipped = [], matchedCount = 0, moves = 0;
+
+    deck.forEach((icon, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.icon = icon;
+      card.dataset.idx = i;
+      card.onclick = () => {
+        if (flipped.length >= 2 || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+        card.classList.add('flipped');
+        card.textContent = icon;
+        flipped.push(card);
+
+        if (flipped.length === 2) {
+          moves++; document.getElementById('moves').textContent = moves;
+          if (flipped[0].dataset.icon === flipped[1].dataset.icon) {
+            flipped.forEach(c => c.classList.add('matched'));
+            matchedCount += 2;
+            flipped = [];
+            if (matchedCount === deck.length) alert(`🎉 Well done! Completed in ${moves} moves!`);
+          } else {
+            setTimeout(() => {
+              flipped.forEach(c => { c.classList.remove('flipped'); c.textContent = ''; });
+              flipped = [];
+            }, 750);
+          }
+        }
+      };
+      grid.appendChild(card);
+    });
+  </script>
+</body>
+</html>
+
